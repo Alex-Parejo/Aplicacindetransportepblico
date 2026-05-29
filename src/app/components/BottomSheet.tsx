@@ -3,7 +3,7 @@ import { useSpring, animated } from "@react-spring/web";
 import { useDrag } from "@use-gesture/react";
 
 interface BottomSheetProps {
-  children: ReactNode;
+  children?: ReactNode;
   collapsedContent?: ReactNode;
   expandedContent?: ReactNode;
 }
@@ -19,10 +19,10 @@ export function BottomSheet({ children, collapsedContent, expandedContent }: Bot
     ({ last, movement: [, my], velocity: [, vy], direction: [, dy] }) => {
       if (last) {
         // Snap to expanded or collapsed based on drag direction and velocity
-        if (my < -100 || (vy > 0.5 && dy < 0)) {
+        if (my < -80 || (vy > 0.4 && dy < 0)) {
           setIsExpanded(true);
           api.start({ y: 0, immediate: false });
-        } else if (my > 100 || (vy > 0.5 && dy > 0)) {
+        } else if (my > 80 || (vy > 0.4 && dy > 0)) {
           setIsExpanded(false);
           api.start({ y: 0, immediate: false });
         } else {
@@ -35,7 +35,7 @@ export function BottomSheet({ children, collapsedContent, expandedContent }: Bot
     {
       from: () => [0, y.get()],
       filterTaps: true,
-      bounds: { top: -400, bottom: 0 },
+      bounds: { top: -450, bottom: 0 },
       rubberband: true,
     }
   );
@@ -46,26 +46,23 @@ export function BottomSheet({ children, collapsedContent, expandedContent }: Bot
       style={{
         y,
         touchAction: 'none',
-        height: isExpanded ? '85vh' : '35vh',
-        transition: 'height 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-        paddingBottom: isExpanded ? '0' : '80px',
+        height: isExpanded ? '80%' : '38%',
+        transition: 'height 350ms cubic-bezier(0.23, 1, 0.32, 1)',
+        paddingBottom: isExpanded ? '32px' : '96px', // Extra spacing for floating tab bar
       }}
-      className="fixed bottom-0 left-0 right-0 z-[998] bg-card rounded-t-3xl shadow-navbar border-t border-border overflow-hidden"
+      className="absolute bottom-0 left-0 right-0 z-[998] rounded-t-[28px] glass-panel select-none overflow-hidden"
     >
-      {/* Handle bar */}
-      <div className="flex justify-center pt-3 pb-2 cursor-grab active:cursor-grabbing">
+      {/* Handle bar drag indicator */}
+      <div className="flex justify-center pt-3 pb-3 cursor-grab active:cursor-grabbing border-b border-white/[0.02]">
         <div
-          className="h-1 rounded-full bg-text-faint"
-          style={{ width: '32px' }}
+          className="h-1 rounded-full bg-white/20 transition-colors group-hover:bg-white/40"
+          style={{ width: '40px' }}
         />
       </div>
 
-      {/* Content */}
+      {/* Content area */}
       <div
-        className="h-full overflow-y-auto px-5"
-        style={{
-          paddingBottom: isExpanded ? '24px' : '0',
-        }}
+        className="h-full overflow-y-auto px-6 py-4 scrollbar-hide"
       >
         {isExpanded ? (
           expandedContent || children

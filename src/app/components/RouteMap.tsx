@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { routeCoordinates } from "../data/routeCoordinates";
-import { MapPin, Navigation } from "lucide-react";
+import { streetPaths } from "../data/streetPaths";
 import L from "leaflet";
 
 interface RouteMapProps {
@@ -17,14 +17,14 @@ export function RouteMap({ routeId, routeColor, routeName }: RouteMapProps) {
   useEffect(() => {
     if (!mapRef.current || !coordinates || coordinates.length === 0) return;
 
-    // Limpiar mapa existente si hay uno
+    // Clean up existing map
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
     }
 
-    // Crear el mapa
+    // Create Leaflet map centered on Santa Marta route
     const map = L.map(mapRef.current, {
-      zoomControl: true,
+      zoomControl: false, // Turn off default zoom to reposition it nicely
       scrollWheelZoom: true,
       dragging: true,
       touchZoom: true,
@@ -32,87 +32,104 @@ export function RouteMap({ routeId, routeColor, routeName }: RouteMapProps) {
 
     mapInstanceRef.current = map;
 
-    // Agregar capa de OpenStreetMap
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-      maxZoom: 19,
+    // Add CartoDB Dark Matter tile layer
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+      attribution: '&copy; CartoDB',
+      maxZoom: 20,
     }).addTo(map);
 
-    // Dibujar la ruta conectando los paraderos
-    const drawRoute = () => {
-      const latLngs: L.LatLngExpression[] = coordinates.map((stop) => [
-        stop.coordinates[0],
-        stop.coordinates[1],
-      ]);
+    // Add zoom controls to top right
+    L.control.zoom({ position: 'topright' }).addTo(map);
 
-      const polyline = L.polyline(latLngs, {
-        color: routeColor,
-        weight: 5,
-        opacity: 0.8,
-        smoothFactor: 1,
-      }).addTo(map);
+    // Draw active polyline route path
+    const pathPoints = streetPaths[routeId] || coordinates.map((stop) => stop.coordinates);
+    const latLngs: L.LatLngExpression[] = pathPoints.map((coord) => [
+      coord[0],
+      coord[1],
+    ]);
 
-      map.fitBounds(polyline.getBounds(), {
-        padding: [50, 50],
-      });
-    };
+    const polyline = L.polyline(latLngs, {
+      color: routeColor,
+      weight: 4,
+      opacity: 0.9,
+      smoothFactor: 1.2,
+    }).addTo(map);
 
-    // Crear icono personalizado para los marcadores
+    // Fit map bounds to show entire route path
+    map.fitBounds(polyline.getBounds(), {
+      padding: [30, 30],
+    });
+
+    // Observe size updates to recalculate layout and invalidate grey tile bugs
+    const resizeObserver = new ResizeObserver(() => {
+      map.invalidateSize();
+      if (polyline) {
+        map.fitBounds(polyline.getBounds(), {
+          padding: [30, 30],
+          animate: false
+        });
+      }
+    });
+
+    if (mapRef.current) {
+      resizeObserver.observe(mapRef.current);
+    }
+
+    // Create custom marker icon builder
     const createNumberIcon = (number: number, color: string, isFirst: boolean, isLast: boolean) => {
       let markerColor = color;
-      if (isFirst) markerColor = "#10B981"; // Verde para origen
-      if (isLast) markerColor = "#EF4444"; // Rojo para destino
+      if (isFirst) markerColor = "#00E5A0"; // Green for origin
+      if (isLast) markerColor = "#FF6B6B"; // Red for destination
 
       return L.divIcon({
-        className: "custom-marker",
+        className: "route-stop-node",
         html: `
           <div style="
-            width: 32px;
-            height: 32px;
+            width: 24px;
+            height: 24px;
             background-color: ${markerColor};
-            border: 3px solid white;
+            border: 2px solid white;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
             color: white;
-            font-weight: bold;
-            font-size: 14px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            font-weight: 800;
+            font-size: 10px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            font-family: var(--font-mono);
           ">
-            ${number}
+            ${isFirst ? '🚏' : isLast ? '🏁' : number}
           </div>
         `,
-        iconSize: [32, 32],
-        iconAnchor: [16, 16],
+        iconSize: [24, 24],
+        iconAnchor: [12, 12],
       });
     };
 
-    // Agregar marcadores para cada paradero
-    coordinates.forEach((stop, index) => {
+    // Add stop markers (only for actual stops, skip turns with empty name)
+    const actualStops = coordinates.filter(stop => stop.name !== "");
+    actualStops.forEach((stop, index) => {
       const isFirst = index === 0;
-      const isLast = index === coordinates.length - 1;
+      const isLast = index === actualStops.length - 1;
       
       L.marker([stop.coordinates[0], stop.coordinates[1]], {
         icon: createNumberIcon(index + 1, routeColor, isFirst, isLast),
       })
         .addTo(map)
         .bindPopup(`
-          <div style="font-family: Arial, sans-serif;">
-            <strong style="color: ${routeColor};">Parada #${index + 1}</strong><br/>
-            ${stop.name}
-            ${isFirst ? '<br/><span style="color: #10B981; font-weight: bold;">🚏 Origen</span>' : ''}
-            ${isLast ? '<br/><span style="color: #EF4444; font-weight: bold;">🏁 Destino</span>' : ''}
+          <div style="font-family: var(--font-body); color: #F0F2FF; padding: 4px;">
+            <strong style="color: ${routeColor}; font-family: var(--font-display); font-size: 13px;">Parada #${index + 1}</strong>
+            <p style="margin: 4px 0 0 0; font-size: 12px; font-weight: 600;">${stop.name}</p>
+            ${isFirst ? '<span style="color: #00E5A0; font-size: 10px; font-weight: bold;">🚏 Punto de Origen</span>' : ''}
+            ${isLast ? '<span style="color: #FF6B6B; font-size: 10px; font-weight: bold;">🏁 Destino Final</span>' : ''}
           </div>
         `);
     });
 
-    // Dibujar la ruta
-    drawRoute();
-
-    // Cleanup al desmontar
+    // Cleanup map on unmount
     return () => {
+      resizeObserver.disconnect();
       if (mapInstanceRef.current) {
         mapInstanceRef.current.remove();
         mapInstanceRef.current = null;
@@ -122,82 +139,16 @@ export function RouteMap({ routeId, routeColor, routeName }: RouteMapProps) {
 
   if (!coordinates || coordinates.length === 0) {
     return (
-      <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-        <div className="text-center text-gray-500">
-          <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Mapa no disponible para esta ruta</p>
+      <div className="w-full h-full bg-white/5 flex items-center justify-center text-center p-6 border border-white/5 rounded-2xl">
+        <div className="space-y-1.5">
+          <p className="text-xs font-bold text-[#F0F2FF] font-display">Mapa no disponible</p>
+          <p className="text-[10px] text-[#8B8FA8] font-sans">No hay coordenadas cargadas para esta ruta.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="rounded-2xl overflow-hidden shadow-2xl border border-border bg-card">
-      {/* Encabezado del mapa */}
-      <div className="bg-accent/50 border-b border-border px-5 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="bg-primary/10 rounded-xl p-2">
-            <Navigation className="w-5 h-5 text-primary" />
-          </div>
-          <div>
-            <h3 className="font-bold text-foreground">Mapa de Ruta Interactivo</h3>
-            <p className="text-xs text-muted-foreground">OpenStreetMap</p>
-          </div>
-        </div>
-        <span className="text-sm font-semibold text-primary bg-primary/10 px-3 py-1 rounded-full">
-          {coordinates.length} paraderos
-        </span>
-      </div>
-
-      {/* Mapa Leaflet */}
-      <div 
-        ref={mapRef} 
-        className="w-full h-96 bg-muted"
-        style={{ minHeight: "400px" }}
-      />
-
-      {/* Leyenda */}
-      <div className="bg-accent/30 border-t border-border p-5">
-        <div className="flex items-center justify-center gap-6 text-sm mb-4 flex-wrap">
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-green-500 border-2 border-background shadow-lg"></div>
-            <span className="text-foreground font-medium">Origen</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full border-2 border-background shadow-lg" style={{ backgroundColor: routeColor }}></div>
-            <span className="text-foreground font-medium">Paradas</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-red-500 border-2 border-background shadow-lg"></div>
-            <span className="text-foreground font-medium">Destino</span>
-          </div>
-        </div>
-
-        {/* Lista compacta de paraderos */}
-        <div className="border-t border-border pt-4 mt-4">
-          <h4 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
-            <MapPin className="w-4 h-4 text-primary" />
-            Recorrido completo de la ruta:
-          </h4>
-          <div className="grid grid-cols-2 gap-2 text-sm max-h-64 overflow-y-auto">
-            {coordinates.map((stop, index) => (
-              <div key={index} className="flex items-center gap-2 bg-card rounded-lg p-2 border border-border hover:border-primary transition-colors">
-                <div 
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0 shadow-md"
-                  style={{ 
-                    backgroundColor: index === 0 ? "#10B981" : 
-                                     index === coordinates.length - 1 ? "#EF4444" : 
-                                     routeColor 
-                  }}
-                >
-                  {index + 1}
-                </div>
-                <span className="text-foreground font-medium text-xs truncate">{stop.name}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
+    <div ref={mapRef} className="w-full h-full bg-[#0D0F14]" />
   );
 }

@@ -50,75 +50,76 @@ export function BusMarkerIcon({
           filter: "drop-shadow(0px 3px 6px rgba(0,0,0,0.5))",
         }}
       >
-        {/* Bus body - top-down view */}
-        <g transform="translate(6, 12)">
-          {/* Main body */}
-          <rect
-            x="0"
-            y="0"
-            width="28"
-            height="16"
-            rx="5"
-            fill={busColor}
-          />
+        <defs>
+          <linearGradient id="lightBeamGlowReact" x1="0%" y1="50%" x2="100%" y2="50%">
+            <stop offset="0%" stopColor="#FFF4B8" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#FFF4B8" stopOpacity={0}/>
+          </linearGradient>
+          <linearGradient id="glassGradientReact" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#80D0FF" stopOpacity={0.8}/>
+            <stop offset="100%" stopColor="#3A82F6" stopOpacity={0.6}/>
+          </linearGradient>
+        </defs>
 
-          {/* Front windshield (lighter color) */}
-          <rect
-            x="9"
-            y="1"
-            width="10"
-            height="5"
-            rx="2"
-            fill="white"
-            opacity="0.6"
-          />
+        <g transform="translate(4, 10)">
+          {/* Side wheels */}
+          <rect x="5" y="-1.5" width="6" height="2" rx="0.5" fill="#131520" />
+          <rect x="21" y="-1.5" width="6" height="2" rx="0.5" fill="#131520" />
+          <rect x="5" y="19.5" width="6" height="2" rx="0.5" fill="#131520" />
+          <rect x="21" y="19.5" width="6" height="2" rx="0.5" fill="#131520" />
 
-          {/* Side windows */}
-          <rect
-            x="2"
-            y="7"
-            width="4"
-            height="2"
-            rx="0.5"
-            fill="white"
-            opacity="0.4"
-          />
-          <rect
-            x="22"
-            y="7"
-            width="4"
-            height="2"
-            rx="0.5"
-            fill="white"
-            opacity="0.4"
-          />
+          {/* Side mirrors */}
+          <path d="M 23 2 L 26 -2 L 28 -2" stroke="#161820" strokeWidth={1.25} strokeLinecap="round" fill="none" />
+          <rect x="27" y="-3.5" width="2.5" height="1.5" rx="0.5" fill="#0D0F14" />
+          
+          <path d="M 23 18 L 26 22 L 28 22" stroke="#161820" strokeWidth={1.25} strokeLinecap="round" fill="none" />
+          <rect x="27" y="22" width="2.5" height="1.5" rx="0.5" fill="#0D0F14" />
 
-          {/* Wheels */}
-          <circle cx="3" cy="2" r="1.5" fill="#0D0F14" />
-          <circle cx="25" cy="2" r="1.5" fill="#0D0F14" />
-          <circle cx="3" cy="14" r="1.5" fill="#0D0F14" />
-          <circle cx="25" cy="14" r="1.5" fill="#0D0F14" />
+          {/* Light beam */}
+          <path d="M 32 3 L 36 1 L 36 19 L 32 17 Z" fill="url(#lightBeamGlowReact)" opacity={0.3} />
 
-          {/* Route number badge (centered) */}
+          {/* Main Body */}
+          <rect x="0" y="0" width="32" height="20" rx="5" fill={busColor} stroke="#ffffff" strokeWidth={0.5} strokeOpacity={0.2}/>
+
+          {/* Front Windshield */}
+          <path d="M 25 2.5 Q 28 2.5 28 10 Q 28 17.5 25 17.5 Z" fill="url(#glassGradientReact)" />
+          <path d="M 25.5 3.5 Q 27 3.5 27 10 Q 27 16.5 25.5 16.5 Z" fill="#ffffff" opacity="0.2" />
+
+          {/* Headlights */}
+          <circle cx="31" cy="4" r="1" fill="#FFF8D6" />
+          <circle cx="31" cy="16" r="1" fill="#FFF8D6" />
+
+          {/* Side Windows Top */}
+          <rect x="4" y="2.5" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+          <rect x="10" y="2.5" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+          <rect x="16" y="2.5" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+
+          {/* Side Windows Bottom */}
+          <rect x="4" y="16" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+          <rect x="10" y="16" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+          <rect x="16" y="16" width="5" height="1.5" rx="0.5" fill="#161820" opacity="0.6" />
+
+          {/* Rear Window */}
+          <rect x="1" y="4" width="1.5" height="12" rx="0.5" fill="url(#glassGradientReact)" />
+
+          {/* Roof Details / AC */}
+          <rect x="7" y="6" width="13" height="8" rx="2" fill="#0D0F14" opacity="0.2" />
+          <line x1="10" y1="8" x2="17" y2="8" stroke="#FFFFFF" strokeOpacity={0.15} strokeWidth={0.75} />
+          <line x1="10" y1="10" x2="17" y2="10" stroke="#FFFFFF" strokeOpacity={0.15} strokeWidth={0.75} />
+          <line x1="10" y1="12" x2="17" y2="12" stroke="#FFFFFF" strokeOpacity={0.15} strokeWidth={0.75} />
+
+          {/* Route Badge */}
           {number && (
             <>
-              <rect
-                x="10"
-                y="8"
-                width="8"
-                height="6"
-                rx="2"
-                fill="white"
-                opacity="0.9"
-              />
+              <rect x="8" y="7" width="11" height="6" rx="1.5" fill="#FFFFFF" />
               <text
-                x="14"
-                y="13"
+                x="13.5"
+                y="11.5"
                 textAnchor="middle"
-                fontSize="5"
-                fontWeight="bold"
+                fontSize="4.5"
+                fontWeight="900"
                 fill={busColor}
-                fontFamily="var(--font-mono)"
+                fontFamily="monospace"
               >
                 {number}
               </text>
@@ -126,13 +127,13 @@ export function BusMarkerIcon({
           )}
         </g>
 
-        {/* "zzz" for out of service */}
         {isOutOfService && (
           <text
             x="20"
             y="8"
             textAnchor="middle"
             fontSize="6"
+            fontWeight="bold"
             fill="#8B8FA8"
             fontFamily="sans-serif"
           >
@@ -140,16 +141,15 @@ export function BusMarkerIcon({
           </text>
         )}
 
-        {/* Near user pulse border */}
         {isPulsing && (
           <circle
             cx="20"
             cy="20"
-            r="18"
+            r="19"
             fill="none"
             stroke="white"
-            strokeWidth="2"
-            opacity="0.8"
+            strokeWidth="1.5"
+            opacity="0.7"
             style={{
               animation: "pulse 2s infinite",
             }}

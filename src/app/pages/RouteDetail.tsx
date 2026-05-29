@@ -1,24 +1,38 @@
 import { useParams, Link, useNavigate } from "react-router";
-import { busRoutes } from "../data/routes";
-import {
-  ArrowLeft,
-  Bus,
-  Clock,
-  MapPin,
-  DollarSign,
-  Navigation,
-} from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { ArrowLeft, Bus, Clock, MapPin, DollarSign, Navigation, Calendar, Activity, AlertCircle } from "lucide-react";
+import { api } from "../services/api";
+import { type BusRoute } from "../data/routes";
 import { RouteMap } from "../components/RouteMap";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { useTrip } from "../context/TripContext";
+import { cn } from "../components/ui/utils";
 
 export function RouteDetail() {
   const { routeId } = useParams();
   const navigate = useNavigate();
   const { setActiveTrip } = useTrip();
-  const route = busRoutes.find((r) => r.id === routeId);
+  
+  const [route, setRoute] = useState<BusRoute | null>(null);
   const [scheduleToggle, setScheduleToggle] = useState<"weekday" | "weekend">("weekday");
+  const [loading, setLoading] = useState(true);
+  const [selectedStopIndex, setSelectedStopIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    async function loadRoute() {
+      if (!routeId) return;
+      try {
+        setLoading(true);
+        const data = await api.getRouteDetail(routeId);
+        setRoute(data);
+      } catch (err) {
+        console.error("Error loading route details:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadRoute();
+  }, [routeId]);
 
   const handleStartTrip = () => {
     if (route) {
@@ -27,20 +41,44 @@ export function RouteDetail() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="max-w-2xl mx-auto space-y-6 pb-24">
+        {/* Shimmer Header */}
+        <div className="h-44 w-full rounded-3xl bg-white/5 border border-white/[0.03] animate-pulse" />
+        {/* Shimmer Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="h-20 rounded-2xl bg-white/5 animate-pulse" />
+          <div className="h-20 rounded-2xl bg-white/5 animate-pulse" />
+          <div className="h-20 rounded-2xl bg-white/5 animate-pulse" />
+        </div>
+        {/* Shimmer Map */}
+        <div className="h-48 rounded-3xl bg-white/5 animate-pulse" />
+      </div>
+    );
+  }
+
   if (!route) {
     return (
       <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
+        initial={{ opacity: 0, scale: 0.95 }}
         animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-12 bg-card rounded-xl border border-border p-12"
+        className="max-w-md mx-auto text-center py-16 px-8 rounded-3xl border border-white/5 glass-panel space-y-6"
       >
-        <Bus className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-        <h2 className="text-xl font-semibold text-foreground mb-2">
-          Ruta no encontrada
-        </h2>
-        <Link to="/">
-          <button className="mt-4 px-5 py-2 bg-primary text-primary-foreground rounded-lg font-bold">
-            Volver al inicio
+        <div className="w-16 h-16 bg-destructive/10 border border-destructive/20 rounded-full flex items-center justify-center mx-auto text-destructive">
+          <AlertCircle className="w-8 h-8 animate-bounce" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-[#F0F2FF] font-display">
+            Ruta No Encontrada
+          </h2>
+          <p className="text-xs text-[#8B8FA8] font-sans">
+            La ruta de autobús que buscas no existe o ha sido descontinuada.
+          </p>
+        </div>
+        <Link to="/routes" className="block focus-ring-premium rounded-xl">
+          <button className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl font-bold transition-all">
+            Volver a las rutas
           </button>
         </Link>
       </motion.div>
@@ -48,328 +86,246 @@ export function RouteDetail() {
   }
 
   return (
-    <div className="min-h-screen pb-8">
-      {/* Header with gradient */}
-      <div
-        className="relative px-5 pt-6 pb-8"
-        style={{
-          background: 'linear-gradient(180deg, #1E2029 0%, #161820 100%)',
-        }}
+    <div className="max-w-2xl mx-auto pb-36 space-y-6 select-none relative">
+      {/* Route Detail Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative rounded-3xl overflow-hidden border border-white/5 p-6 glass-panel"
       >
-        {/* Back button */}
-        <Link to="/">
-          <button className="mb-5 flex items-center gap-2 text-text-primary hover:text-primary transition-colors">
-            <ArrowLeft className="w-5 h-5" />
-          </button>
+        {/* Color Glow Overlay */}
+        <div 
+          className="absolute -right-24 -top-24 w-48 h-48 rounded-full blur-[80px] opacity-25"
+          style={{ backgroundColor: route.color }}
+        />
+
+        {/* Back Link */}
+        <Link to="/routes" className="inline-flex items-center gap-2 text-xs font-bold text-[#8B8FA8] hover:text-[#F0F2FF] transition-colors focus-ring-premium rounded-lg px-2 py-1 bg-white/5 border border-white/5 mb-5">
+          <ArrowLeft className="w-4 h-4" />
+          Atrás
         </Link>
 
-        {/* Route badge */}
-        <div className="mb-3">
+        {/* Main Badge + Info */}
+        <div className="space-y-3">
           <span
-            className="inline-block px-4 py-1.5 rounded-full text-xs font-bold"
+            className="inline-block px-3 py-1 rounded-lg text-[10px] font-bold text-white font-mono shadow-md border"
             style={{
               backgroundColor: route.color,
-              color: '#F0F2FF',
-              fontFamily: 'var(--font-mono)',
+              borderColor: `${route.color}33`,
             }}
           >
             RUTA {route.number}
           </span>
-        </div>
+          
+          <h1 className="text-xl md:text-2xl font-extrabold text-[#F0F2FF] font-display leading-snug">
+            {route.name}
+          </h1>
 
-        {/* Route title */}
-        <h1
-          className="text-2xl font-bold mb-2"
-          style={{
-            fontFamily: 'var(--font-display)',
-            color: '#F0F2FF',
-          }}
-        >
-          {route.origin} → {route.destination}
-        </h1>
-
-        {/* Subtitle with pins */}
-        <div className="flex items-center gap-2 text-sm" style={{ color: '#8B8FA8' }}>
-          <MapPin className="w-4 h-4" />
-          <span>{route.origin}</span>
-          <span>•</span>
-          <span>{route.destination}</span>
-        </div>
-      </div>
-
-      {/* Stats bar */}
-      <div className="px-5 -mt-4 mb-6">
-        <div className="grid grid-cols-3 gap-3">
-          {/* Frequency stat */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="p-4 rounded-xl border"
-            style={{
-              backgroundColor: '#1E2029',
-              borderColor: 'rgba(255, 255, 255, 0.09)',
-            }}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <Clock className="w-4 h-4" style={{ color: '#00E5A0' }} />
-              <span className="text-xs font-medium" style={{ color: '#8B8FA8' }}>
-                Frecuencia
-              </span>
-            </div>
-            <p
-              className="text-lg font-bold"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#F0F2FF',
-              }}
-            >
-              {route.frequency.replace('Cada ', '')}
-            </p>
-          </motion.div>
-
-          {/* Fare stat */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="p-4 rounded-xl border"
-            style={{
-              backgroundColor: '#1E2029',
-              borderColor: 'rgba(255, 255, 255, 0.09)',
-            }}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <DollarSign className="w-4 h-4" style={{ color: '#4F8EF7' }} />
-              <span className="text-xs font-medium" style={{ color: '#8B8FA8' }}>
-                Tarifa
-              </span>
-            </div>
-            <p
-              className="text-lg font-bold"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#F0F2FF',
-              }}
-            >
-              {route.fare}
-            </p>
-          </motion.div>
-
-          {/* Stops stat */}
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            className="p-4 rounded-xl border"
-            style={{
-              backgroundColor: '#1E2029',
-              borderColor: 'rgba(255, 255, 255, 0.09)',
-            }}
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              <MapPin className="w-4 h-4" style={{ color: '#FF6B6B' }} />
-              <span className="text-xs font-medium" style={{ color: '#8B8FA8' }}>
-                Paradas
-              </span>
-            </div>
-            <p
-              className="text-lg font-bold"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#F0F2FF',
-              }}
-            >
-              {route.stops.length}
-            </p>
-          </motion.div>
-        </div>
-      </div>
-
-      {/* Map section */}
-      <div className="px-5 mb-6">
-        <div className="rounded-xl overflow-hidden">
-          <RouteMap
-            routeId={route.id}
-            routeColor={route.color}
-            routeName={route.name}
-          />
-        </div>
-      </div>
-
-      {/* Schedule section */}
-      <div className="px-5 mb-6">
-        <h2
-          className="text-lg font-bold mb-4"
-          style={{
-            fontFamily: 'var(--font-display)',
-            color: '#F0F2FF',
-          }}
-        >
-          Horarios
-        </h2>
-
-        {/* Segmented control */}
-        <div
-          className="inline-flex p-1 rounded-xl mb-4"
-          style={{ backgroundColor: '#1E2029' }}
-        >
-          <button
-            onClick={() => setScheduleToggle("weekday")}
-            className="px-5 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              backgroundColor: scheduleToggle === "weekday" ? '#00E5A0' : 'transparent',
-              color: scheduleToggle === "weekday" ? '#0D0F14' : '#8B8FA8',
-            }}
-          >
-            Lun-Vie
-          </button>
-          <button
-            onClick={() => setScheduleToggle("weekend")}
-            className="px-5 py-2 rounded-lg text-sm font-medium transition-all"
-            style={{
-              backgroundColor: scheduleToggle === "weekend" ? '#00E5A0' : 'transparent',
-              color: scheduleToggle === "weekend" ? '#0D0F14' : '#8B8FA8',
-            }}
-          >
-            Sáb-Dom
-          </button>
-        </div>
-
-        {/* Timeline */}
-        <div className="flex items-center gap-3">
-          <div className="flex flex-col items-center">
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: '#00E5A0' }}
-            />
-            <div
-              className="w-0.5 h-12"
-              style={{
-                background: 'linear-gradient(180deg, #00E5A0 0%, #4A4D60 100%)',
-              }}
-            />
-            <div
-              className="w-3 h-3 rounded-full"
-              style={{ backgroundColor: '#FF6B6B' }}
-            />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-medium mb-1" style={{ color: '#F0F2FF' }}>
-              Inicio
-            </p>
-            <p
-              className="text-xl font-bold mb-4"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#00E5A0',
-              }}
-            >
-              {scheduleToggle === "weekday"
-                ? route.schedule.weekday.split(" - ")[0]
-                : route.schedule.weekend.split(" - ")[0]}
-            </p>
-            <p className="text-sm font-medium mb-1" style={{ color: '#F0F2FF' }}>
-              Fin de servicio
-            </p>
-            <p
-              className="text-xl font-bold"
-              style={{
-                fontFamily: 'var(--font-mono)',
-                color: '#FF6B6B',
-              }}
-            >
-              {scheduleToggle === "weekday"
-                ? route.schedule.weekday.split(" - ")[1]
-                : route.schedule.weekend.split(" - ")[1]}
-            </p>
+          <div className="flex items-center gap-2 text-xs text-[#8B8FA8] font-sans">
+            <MapPin className="w-4 h-4 text-primary" />
+            <span className="truncate">{route.origin}</span>
+            <span className="text-[#4A4D60]">•</span>
+            <span className="truncate">{route.destination}</span>
           </div>
         </div>
+      </motion.div>
+
+      {/* Stats Cards Row */}
+      <div className="grid grid-cols-3 gap-3">
+        {/* Frequency */}
+        <motion.div
+          whileHover={{ translateY: -2 }}
+          className="p-3.5 rounded-2xl border border-white/5 glass-panel text-center space-y-1.5"
+        >
+          <div className="flex items-center justify-center gap-1.5 text-[#8B8FA8]">
+            <Clock className="w-3.5 h-3.5 text-primary" />
+            <span className="text-[10px] font-bold uppercase tracking-wider font-display">Intervalo</span>
+          </div>
+          <p className="text-sm font-extrabold text-[#F0F2FF] font-mono leading-none">
+            {route.frequency.replace("Cada ", "")}
+          </p>
+        </motion.div>
+
+        {/* Fare */}
+        <motion.div
+          whileHover={{ translateY: -2 }}
+          className="p-3.5 rounded-2xl border border-white/5 glass-panel text-center space-y-1.5"
+        >
+          <div className="flex items-center justify-center gap-1.5 text-[#8B8FA8]">
+            <DollarSign className="w-3.5 h-3.5 text-secondary" />
+            <span className="text-[10px] font-bold uppercase tracking-wider font-display">Tarifa</span>
+          </div>
+          <p className="text-sm font-extrabold text-[#00E5A0] font-mono leading-none">
+            {route.fare}
+          </p>
+        </motion.div>
+
+        {/* Stops */}
+        <motion.div
+          whileHover={{ translateY: -2 }}
+          className="p-3.5 rounded-2xl border border-white/5 glass-panel text-center space-y-1.5"
+        >
+          <div className="flex items-center justify-center gap-1.5 text-[#8B8FA8]">
+            <Activity className="w-3.5 h-3.5 text-[#FF6B6B]" />
+            <span className="text-[10px] font-bold uppercase tracking-wider font-display">Paradas</span>
+          </div>
+          <p className="text-sm font-extrabold text-[#F0F2FF] font-mono leading-none">
+            {route.stops.length}
+          </p>
+        </motion.div>
       </div>
 
-      {/* Stops timeline */}
-      <div className="px-5">
-        <h2
-          className="text-lg font-bold mb-4"
-          style={{
-            fontFamily: 'var(--font-display)',
-            color: '#F0F2FF',
-          }}
-        >
-          Recorrido de paradas
-        </h2>
+      {/* Map Section */}
+      <div className="rounded-3xl overflow-hidden border border-white/5 shadow-2xl h-[220px] relative">
+        <RouteMap
+          routeId={route.id}
+          routeColor={route.color}
+          routeName={route.name}
+        />
+      </div>
 
-        <div className="relative">
-          {/* Vertical line */}
-          <div
-            className="absolute left-4 top-0 bottom-0 w-0.5"
-            style={{ backgroundColor: route.color, opacity: 0.3 }}
-          />
+      {/* Grid of details: Schedule & Stop Timeline */}
+      <div className="grid md:grid-cols-2 gap-6">
+        
+        {/* Schedule box */}
+        <div className="space-y-4 rounded-3xl border border-white/5 p-5 glass-panel h-fit">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-secondary" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[#8B8FA8] font-display">
+              Horarios de Servicio
+            </h2>
+          </div>
 
-          {/* Stops */}
-          <div className="space-y-4">
-            {route.stops.map((stop, index) => {
-              const isFirst = index === 0;
-              const isLast = index === route.stops.length - 1;
-
-              return (
+          {/* Segmented active control toggle */}
+          <div className="flex p-1 rounded-xl bg-white/5 border border-white/[0.03]">
+            <button
+              onClick={() => setScheduleToggle("weekday")}
+              className="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all relative focus-ring-premium text-center"
+            >
+              {scheduleToggle === "weekday" && (
                 <motion.div
-                  key={index}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  className="relative flex items-start gap-4"
-                >
-                  {/* Stop marker */}
-                  <div className="relative z-10 flex-shrink-0">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm border-2"
-                      style={{
-                        backgroundColor: isFirst ? '#10B981' : isLast ? '#EF4444' : route.color,
-                        borderColor: '#161820',
-                      }}
-                    >
-                      {isFirst || isLast ? (
-                        isFirst ? '🚏' : '🏁'
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                  </div>
+                  layoutId="scheduleActiveBg"
+                  className="absolute inset-0 rounded-lg bg-white/10 border border-white/5 -z-10"
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                />
+              )}
+              <span className={scheduleToggle === "weekday" ? "text-white" : "text-[#8B8FA8]"}>Lun - Vie</span>
+            </button>
+            <button
+              onClick={() => setScheduleToggle("weekend")}
+              className="flex-1 py-1.5 text-xs font-bold rounded-lg transition-all relative focus-ring-premium text-center"
+            >
+              {scheduleToggle === "weekend" && (
+                <motion.div
+                  layoutId="scheduleActiveBg"
+                  className="absolute inset-0 rounded-lg bg-white/10 border border-white/5 -z-10"
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                />
+              )}
+              <span className={scheduleToggle === "weekend" ? "text-white" : "text-[#8B8FA8]"}>Sáb - Dom</span>
+            </button>
+          </div>
 
-                  {/* Stop info */}
-                  <div className="flex-1 pt-1">
-                    <p
-                      className="font-semibold mb-1"
-                      style={{
-                        color: '#F0F2FF',
-                        fontFamily: 'var(--font-body)',
-                      }}
-                    >
-                      {stop}
-                    </p>
-                    <p className="text-xs" style={{ color: '#8B8FA8' }}>
-                      {isFirst && "Punto de origen"}
-                      {isLast && "Punto de destino"}
-                      {!isFirst && !isLast && `≈ ${index * 2} min desde origen`}
-                    </p>
-                  </div>
-                </motion.div>
-              );
-            })}
+          {/* Schedule Clock Times */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between border-b border-white/[0.03] pb-2">
+              <span className="text-xs text-[#8B8FA8] font-sans">Primer servicio</span>
+              <span className="text-sm font-extrabold text-[#00E5A0] font-mono">
+                {scheduleToggle === "weekday"
+                  ? route.schedule.weekday.split(" - ")[0]
+                  : route.schedule.weekend.split(" - ")[0]}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-[#8B8FA8] font-sans">Último servicio</span>
+              <span className="text-sm font-extrabold text-[#FF6B6B] font-mono">
+                {scheduleToggle === "weekday"
+                  ? route.schedule.weekday.split(" - ")[1]
+                  : route.schedule.weekend.split(" - ")[1]}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stops timeline box */}
+        <div className="space-y-4 rounded-3xl border border-white/5 p-5 glass-panel">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-[#8B8FA8] font-display">
+            Paradas del Recorrido
+          </h2>
+
+          <div className="relative pl-2 pt-2">
+            {/* Vertical timeline connector */}
+            <div
+              className="absolute left-6 top-4 bottom-4 w-0.5"
+              style={{ backgroundColor: `${route.color}33` }}
+            />
+
+            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-1 scrollbar-hide">
+              {route.stops.map((stop, index) => {
+                const isFirst = index === 0;
+                const isLast = index === route.stops.length - 1;
+                const isSelected = selectedStopIndex === index;
+
+                return (
+                  <motion.div
+                    key={index}
+                    onClick={() => setSelectedStopIndex(isSelected ? null : index)}
+                    className="flex items-start gap-3 cursor-pointer group"
+                    whileHover={{ x: 2 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                  >
+                    {/* Circle Node */}
+                    <div className="relative z-10 flex-shrink-0 mt-0.5">
+                      <div
+                        className={cn(
+                          "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border-2 transition-all duration-300 shadow-md",
+                          isSelected ? "scale-110" : "group-hover:scale-105"
+                        )}
+                        style={{
+                          backgroundColor: isFirst ? '#00E5A0' : isLast ? '#FF6B6B' : route.color,
+                          borderColor: isSelected ? '#F0F2FF' : '#131520',
+                          color: '#FFFFFF'
+                        }}
+                      >
+                        {isFirst ? '🚏' : isLast ? '🏁' : index + 1}
+                      </div>
+                    </div>
+
+                    {/* Node contents */}
+                    <div className="flex-1 pt-1.5 min-w-0">
+                      <h4 className={cn(
+                        "text-xs font-bold truncate transition-colors",
+                        isSelected ? "text-[#00E5A0]" : "text-[#F0F2FF] group-hover:text-primary"
+                      )}>
+                        {stop}
+                      </h4>
+                      <p className="text-[10px] text-[#8B8FA8] mt-0.5 font-sans">
+                        {isFirst && "Punto de partida"}
+                        {isLast && "Destino final"}
+                        {!isFirst && !isLast && `≈ ${index * 3} min en autobús`}
+                      </p>
+                    </div>
+                  </motion.div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Fixed bottom CTA */}
-      <div className="fixed bottom-20 left-0 right-0 px-5 pb-4 z-50">
-        <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
-          onClick={handleStartTrip}
-          className="w-full py-4 rounded-xl font-bold text-base shadow-2xl flex items-center justify-center gap-2"
-          style={{
-            backgroundColor: '#00E5A0',
-            color: '#0D0F14',
-          }}
-        >
-          <Navigation className="w-5 h-5" />
-          Iniciar viaje
-        </motion.button>
+      {/* Floating CTA wrapper */}
+      <div className="absolute bottom-20 left-0 right-0 z-50 flex justify-center px-4 pointer-events-none">
+        <div className="w-full max-w-[450px] pointer-events-auto">
+          <motion.button
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+            onClick={handleStartTrip}
+            className="w-full py-3.5 rounded-2xl font-bold text-sm shadow-2xl flex items-center justify-center gap-2 bg-[#00E5A0] text-[#0D0F14] hover:bg-[#00E5A0]/90 transition-colors focus-ring-premium"
+          >
+            <Navigation className="w-4 h-4 fill-[#0D0F14]" />
+            Empezar Viaje
+          </motion.button>
+        </div>
       </div>
     </div>
   );

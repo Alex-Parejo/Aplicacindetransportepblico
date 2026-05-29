@@ -1,82 +1,84 @@
-import { useState, useEffect } from "react";
-import { MapPin, Navigation, AlertCircle, Loader2, Bus, Clock, MapPinned, Users } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { MapPin, Navigation, AlertCircle, Loader2, Bus, Clock, MapPinned, Compass } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Link } from "react-router";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { busRoutes } from "../data/routes";
+import { api, type UserProfile } from "../services/api";
+import { type BusRoute } from "../data/routes";
 import { routeCoordinates } from "../data/routeCoordinates";
-import { generateLiveBuses, type LiveBus } from "../data/liveData";
+import { type LiveBus } from "../data/liveData";
+import { cn } from "../components/ui/utils";
 
-// Fix Leaflet default marker icon issue
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
-
-interface UserLocation {
-  lat: number;
-  lng: number;
-}
-
-interface NearbyRoute {
-  route: typeof busRoutes[0];
-  nearestStop: string;
-  distance: number;
-}
-
-// Component to recenter map when location changes
-function MapRecenter({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.setView(center, 15);
-  }, [center, map]);
-  return null;
-}
-
-// Custom user location icon
-const userLocationIcon = new L.DivIcon({
+// User current position marker icon
+const userLocationIcon = L.divIcon({
   html: `
     <div style="position: relative;">
       <div style="
-        width: 20px;
-        height: 20px;
-        background: #6366f1;
-        border: 3px solid white;
+        width: 18px;
+        height: 18px;
+        background: #4F8EF7;
+        border: 3px solid #F0F2FF;
         border-radius: 50%;
-        box-shadow: 0 0 10px rgba(99, 102, 241, 0.5);
+        box-shadow: 0 0 16px rgba(79, 142, 247, 0.6);
       "></div>
       <div style="
         position: absolute;
-        top: 0;
-        left: 0;
-        width: 20px;
-        height: 20px;
-        background: rgba(99, 102, 241, 0.3);
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 36px;
+        height: 36px;
+        background: rgba(79, 142, 247, 0.2);
         border-radius: 50%;
-        animation: pulse 2s infinite;
+        animation: pulse 2.5s infinite;
       "></div>
     </div>
   `,
   className: "user-location-marker",
-  iconSize: [20, 20],
-  iconAnchor: [10, 10],
+  iconSize: [18, 18],
+  iconAnchor: [9, 9],
 });
 
+interface NearbyRoute {
+  route: BusRoute;
+  nearestStop: string;
+  distance: number;
+}
+
 export function Live() {
-  const [userLocation, setUserLocation] = useState<UserLocation | null>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<L.Map | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const userCircleRef = useRef<L.Circle | null>(null);
+  const stopsMarkersRef = useRef<L.Marker[]>([]);
+  const busMarkersRef = useRef<L.Marker[]>([]);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [nearbyRoutes, setNearbyRoutes] = useState<NearbyRoute[]>([]);
   const [locationEnabled, setLocationEnabled] = useState(false);
   const [liveBuses, setLiveBuses] = useState<LiveBus[]>([]);
+  const [routes, setRoutes] = useState<BusRoute[]>([]);
 
-  // Calculate distance between two coordinates (Haversine formula)
+  // Load routes
+  useEffect(() => {
+    async function loadRoutes() {
+      try {
+        const data = await api.getRoutes();
+        setRoutes(data);
+      } catch (err) {
+        console.error("Error loading routes:", err);
+      }
+    }
+    loadRoutes();
+  }, []);
+
+  // Distance calculation helper (Haversine)
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
-    const R = 6371; // Earth's radius in km
+    const R = 6371; 
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a =
@@ -87,11 +89,11 @@ export function Live() {
     return R * c;
   };
 
-  // Find nearby routes based on user location
-  const findNearbyRoutes = (location: UserLocation) => {
+  // Find routes near user GPS coordinates
+  const findNearbyRoutes = (location: { lat: number; lng: number }, routesList: BusRoute[]) => {
     const nearby: NearbyRoute[] = [];
 
-    busRoutes.forEach((route) => {
+    routesList.forEach((route) => {
       const routeStops = routeCoordinates[route.id];
       if (!routeStops) return;
 
@@ -112,8 +114,8 @@ export function Live() {
         }
       });
 
-      // Only include routes within 2km
-      if (nearestDistance < 2) {
+      // Filter within 2.5 kilometers
+      if (nearestDistance < 2.5) {
         nearby.push({
           route,
           nearestStop: nearestStopName,
@@ -122,18 +124,17 @@ export function Live() {
       }
     });
 
-    // Sort by distance
     nearby.sort((a, b) => a.distance - b.distance);
     setNearbyRoutes(nearby);
   };
 
-  // Get user's current location
+  // Geolocation trigger
   const getUserLocation = () => {
     setLoading(true);
     setError(null);
 
     if (!navigator.geolocation) {
-      setError("Tu navegador no soporta geolocalización");
+      setError("Tu navegador no soporta geolocalización.");
       setLoading(false);
       return;
     }
@@ -146,25 +147,27 @@ export function Live() {
         };
         setUserLocation(location);
         setLocationEnabled(true);
-        findNearbyRoutes(location);
+        if (routes.length > 0) {
+          findNearbyRoutes(location, routes);
+        }
         setLoading(false);
       },
       (err) => {
-        setError("No se pudo obtener tu ubicación. Por favor, permite el acceso.");
+        setError("Acceso denegado al GPS. Por favor, habilita los permisos de ubicación.");
         setLoading(false);
         console.error(err);
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 8000,
         maximumAge: 0,
       }
     );
   };
 
-  // Watch user location for real-time updates
+  // Watch location
   useEffect(() => {
-    if (!locationEnabled) return;
+    if (!locationEnabled || !userLocation || routes.length === 0) return;
 
     const watchId = navigator.geolocation.watchPosition(
       (position) => {
@@ -173,7 +176,7 @@ export function Live() {
           lng: position.coords.longitude,
         };
         setUserLocation(location);
-        findNearbyRoutes(location);
+        findNearbyRoutes(location, routes);
       },
       (err) => {
         console.error("Error watching location:", err);
@@ -188,344 +191,381 @@ export function Live() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
     };
-  }, [locationEnabled]);
+  }, [locationEnabled, routes]);
 
-  // Update live buses data
+  // Load and update live buses
   useEffect(() => {
-    // Initialize immediately
-    setLiveBuses(generateLiveBuses());
+    async function loadLiveBuses() {
+      try {
+        const data = await api.getLiveBuses();
+        setLiveBuses(data);
+      } catch (err) {
+        console.error("Error loading live buses:", err);
+      }
+    }
     
-    // Update every 5 seconds
-    const intervalId = setInterval(() => {
-      setLiveBuses(generateLiveBuses());
-    }, 5000);
+    loadLiveBuses();
+    const interval = setInterval(loadLiveBuses, 6000);
+    return () => clearInterval(interval);
+  }, []);
 
-    return () => clearInterval(intervalId);
+  // Map initialization
+  useEffect(() => {
+    if (!mapRef.current || !userLocation) return;
+
+    if (!mapInstanceRef.current) {
+      const map = L.map(mapRef.current, {
+        zoomControl: false,
+        scrollWheelZoom: true,
+        dragging: true,
+        touchZoom: true,
+      }).setView([userLocation.lat, userLocation.lng], 15);
+
+      L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+        attribution: '&copy; CartoDB',
+        maxZoom: 20,
+      }).addTo(map);
+
+      // Add zoom controls to top right
+      L.control.zoom({ position: 'topright' }).addTo(map);
+
+      mapInstanceRef.current = map;
+
+      const resizeObserver = new ResizeObserver(() => {
+        map.invalidateSize();
+      });
+      resizeObserver.observe(mapRef.current);
+      resizeObserverRef.current = resizeObserver;
+    }
+  }, [userLocation]);
+
+  // Update user location marker & circle
+  useEffect(() => {
+    if (!mapInstanceRef.current || !userLocation) return;
+    const map = mapInstanceRef.current;
+
+    // Recenter
+    map.setView([userLocation.lat, userLocation.lng]);
+
+    // User location icon
+    const userLocIcon = L.divIcon({
+      html: `
+        <div style="position: relative;">
+          <div style="
+            width: 18px;
+            height: 18px;
+            background: #4F8EF7;
+            border: 3px solid #F0F2FF;
+            border-radius: 50%;
+            box-shadow: 0 0 16px rgba(79, 142, 247, 0.6);
+          "></div>
+          <div style="
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 36px;
+            height: 36px;
+            background: rgba(79, 142, 247, 0.2);
+            border-radius: 50%;
+            animation: pulse 2.5s infinite;
+          "></div>
+        </div>
+      `,
+      className: "user-location-marker",
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+    });
+
+    if (userMarkerRef.current) {
+      userMarkerRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+    } else {
+      userMarkerRef.current = L.marker([userLocation.lat, userLocation.lng], { icon: userLocIcon })
+        .addTo(map)
+        .bindPopup(`
+          <div style="text-align: center; font-family: var(--font-body); font-size: 11px;">
+            <strong>Tu posición actual</strong>
+          </div>
+        `);
+    }
+
+    if (userCircleRef.current) {
+      userCircleRef.current.setLatLng([userLocation.lat, userLocation.lng]);
+    } else {
+      userCircleRef.current = L.circle([userLocation.lat, userLocation.lng], {
+        radius: 1000,
+        fillColor: "#4F8EF7",
+        fillOpacity: 0.05,
+        color: "#4F8EF7",
+        weight: 1.5,
+        opacity: 0.4,
+      }).addTo(map);
+    }
+  }, [userLocation]);
+
+  // Draw nearby stops
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    // Clear old stops markers
+    stopsMarkersRef.current.forEach((m) => m.remove());
+    stopsMarkersRef.current = [];
+
+    nearbyRoutes.forEach((nearby) => {
+      const routeStops = routeCoordinates[nearby.route.id];
+      if (!routeStops) return;
+
+      routeStops.forEach((stop) => {
+        const marker = L.marker([stop.coordinates[0], stop.coordinates[1]])
+          .addTo(map)
+          .bindPopup(`
+            <div style="font-family: var(--font-body); font-size: 11px; padding: 4px;">
+              <strong>${stop.name}</strong>
+              <p style="color: ${nearby.route.color}; font-weight: bold; margin: 4px 0 0 0;">
+                Ruta ${nearby.route.number}: ${nearby.route.name}
+              </p>
+            </div>
+          `);
+        stopsMarkersRef.current.push(marker);
+      });
+    });
+  }, [nearbyRoutes]);
+
+  // Update live buses on the map
+  useEffect(() => {
+    if (!mapInstanceRef.current) return;
+    const map = mapInstanceRef.current;
+
+    // Clear old bus markers
+    busMarkersRef.current.forEach((m) => m.remove());
+    busMarkersRef.current = [];
+
+    liveBuses.forEach((bus) => {
+      const busIcon = L.divIcon({
+        html: `
+          <div style="
+            width: 32px;
+            height: 32px;
+            background: ${bus.routeColor};
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 11px;
+            color: white;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            font-family: var(--font-mono);
+          ">${bus.routeNumber}</div>
+        `,
+        className: "bus-marker-live",
+        iconSize: [32, 32],
+        iconAnchor: [16, 16],
+      });
+
+      const marker = L.marker([bus.coordinates[0], bus.coordinates[1]], { icon: busIcon })
+        .addTo(map)
+        .bindPopup(`
+          <div style="font-family: var(--font-body); font-size: 11px; min-width: 160px; color: #F0F2FF; padding: 4px;">
+            <p style="font-weight: bold; color: ${bus.routeColor}; font-size: 12px; margin: 0 0 4px 0;">
+              🚌 Buseta Ruta ${bus.routeNumber}
+            </p>
+            <div style="display: grid; gap: 2px; color: #8B8FA8;">
+              <div>Velocidad: <strong style="color: #F0F2FF">${bus.speed} km/h</strong></div>
+              <div>Ocupación: <strong style="color: #F0F2FF">${bus.passengerCount}/${bus.capacity} pax</strong></div>
+              <div style="color: #00E5A0; font-weight: bold; margin-top: 4px;">⏱ Llego en ${bus.estimatedArrival} min</div>
+            </div>
+          </div>
+        `);
+      busMarkersRef.current.push(marker);
+    });
+  }, [liveBuses]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+      }
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+      }
+    };
   }, []);
 
   return (
-    <div className="pb-20 min-h-screen">
-      {/* Header */}
+    <div className="pb-24 max-w-2xl mx-auto space-y-6 select-none">
+      {/* Title Header */}
       <motion.div
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        className="sticky top-0 z-10 bg-card/95 backdrop-blur-xl border-b border-border shadow-lg"
+        initial={{ opacity: 0, y: -15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden border border-white/5 p-6 rounded-3xl glass-panel"
       >
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3">
-            <motion.div
-              animate={{
-                rotate: locationEnabled ? [0, 360] : 0,
-              }}
-              transition={{
-                duration: 2,
-                repeat: locationEnabled ? Infinity : 0,
-                ease: "linear",
-              }}
-              className="p-3 bg-primary/10 rounded-2xl"
-            >
-              <Navigation className="w-6 h-6 text-primary" />
-            </motion.div>
-            <div>
-              <h1 className="text-xl font-bold">GPS En Vivo</h1>
-              <p className="text-sm text-muted-foreground">
-                {locationEnabled ? "Ubicación activa" : "Encuentra rutas cerca de ti"}
-              </p>
-            </div>
+        <div className="absolute -right-24 -top-24 w-48 h-48 rounded-full bg-gradient-to-br from-[#4F8EF7]/20 to-[#00E5A0]/20 blur-[100px]" />
+        
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center gap-2 text-primary">
+            <Compass className="w-5 h-5" />
+            <h1 className="text-xl md:text-2xl font-extrabold text-[#F0F2FF] font-display leading-none">
+              GPS En Vivo
+            </h1>
           </div>
+          <p className="text-xs text-[#8B8FA8] font-sans">
+            Rastrea las busetas en movimiento en tiempo real y encuentra las paradas y rutas más cercanas a tu ubicación.
+          </p>
         </div>
       </motion.div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Location Button */}
-        {!locationEnabled && (
-          <motion.div
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-center space-y-4"
+      {/* Geolocation permissions prompt */}
+      {!locationEnabled && (
+        <motion.div
+          initial={{ scale: 0.95, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="rounded-3xl border border-white/5 p-8 text-center glass-panel space-y-6"
+        >
+          <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center mx-auto border border-white/5 text-[#4F8EF7]">
+            <MapPinned className="w-8 h-8 opacity-45 animate-pulse" />
+          </div>
+          <div className="space-y-2 max-w-sm mx-auto">
+            <h2 className="text-base font-bold text-[#F0F2FF] font-display">Localizar en el mapa</h2>
+            <p className="text-xs text-[#8B8FA8] font-sans">
+              Para mostrarte las busetas y paraderos más cercanos a ti, necesitamos acceso a la ubicación de tu dispositivo.
+            </p>
+          </div>
+          <button
+            onClick={getUserLocation}
+            disabled={loading}
+            className="w-full max-w-[240px] py-3 bg-[#4F8EF7] text-white rounded-xl font-bold transition-all shadow-glow flex items-center justify-center gap-2 focus-ring-premium mx-auto"
           >
-            <motion.div
-              animate={{
-                scale: [1, 1.05, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-              }}
-              className="inline-flex p-6 bg-primary/10 rounded-full"
-            >
-              <MapPinned className="w-16 h-16 text-primary" />
-            </motion.div>
+            {loading ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>Localizando…</span>
+              </>
+            ) : (
+              <>
+                <Navigation className="w-4 h-4 fill-white" />
+                <span>Activar GPS</span>
+              </>
+            )}
+          </button>
+        </motion.div>
+      )}
 
-            <div className="space-y-2">
-              <h2 className="text-2xl font-bold">Activa tu ubicación</h2>
-              <p className="text-muted-foreground max-w-md mx-auto">
-                Te mostraremos las rutas de buses más cercanas a tu posición actual
-              </p>
-            </div>
-
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={getUserLocation}
-              disabled={loading}
-              className="px-8 py-4 bg-primary text-primary-foreground rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-shadow disabled:opacity-50 inline-flex items-center gap-3"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Obteniendo ubicación...
-                </>
-              ) : (
-                <>
-                  <Navigation className="w-5 h-5" />
-                  Activar GPS
-                </>
-              )}
-            </motion.button>
-          </motion.div>
-        )}
-
-        {/* Error Message */}
-        <AnimatePresence>
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 flex items-start gap-3"
-            >
-              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold text-destructive">Error de ubicación</p>
-                <p className="text-sm text-destructive/80">{error}</p>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        {/* Map */}
-        {userLocation && (
+      {/* Error notification alert */}
+      <AnimatePresence>
+        {error && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="rounded-3xl overflow-hidden shadow-2xl border border-border"
-          >
-            <div className="h-[400px] relative">
-              <MapContainer
-                center={[userLocation.lat, userLocation.lng]}
-                zoom={15}
-                style={{ height: "100%", width: "100%" }}
-                zoomControl={true}
-              >
-                <TileLayer
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                />
-                <MapRecenter center={[userLocation.lat, userLocation.lng]} />
-
-                {/* User location marker */}
-                <Marker
-                  position={[userLocation.lat, userLocation.lng]}
-                  icon={userLocationIcon}
-                >
-                  <Popup>
-                    <div className="text-center">
-                      <p className="font-bold">Tu ubicación</p>
-                      <p className="text-xs text-gray-600">
-                        {userLocation.lat.toFixed(4)}, {userLocation.lng.toFixed(4)}
-                      </p>
-                    </div>
-                  </Popup>
-                </Marker>
-
-                {/* Coverage radius */}
-                <Circle
-                  center={[userLocation.lat, userLocation.lng]}
-                  radius={2000}
-                  pathOptions={{
-                    fillColor: "#6366f1",
-                    fillOpacity: 0.1,
-                    color: "#6366f1",
-                    weight: 2,
-                    opacity: 0.5,
-                  }}
-                />
-
-                {/* Nearby stops markers */}
-                {nearbyRoutes.map((nearby) => {
-                  const routeStops = routeCoordinates[nearby.route.id];
-                  if (!routeStops) return null;
-
-                  return routeStops.map((stop, idx) => (
-                    <Marker key={`${nearby.route.id}-${idx}`} position={stop.coordinates}>
-                      <Popup>
-                        <div className="text-center">
-                          <p className="font-bold">{stop.name}</p>
-                          <p className="text-xs" style={{ color: nearby.route.color }}>
-                            Ruta {nearby.route.number}: {nearby.route.name}
-                          </p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ));
-                })}
-
-                {/* Live buses markers */}
-                {liveBuses.map((bus) => {
-                  const busIcon = new L.DivIcon({
-                    html: `
-                      <div style="
-                        width: 32px;
-                        height: 32px;
-                        background: ${bus.routeColor};
-                        border: 3px solid white;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        font-weight: bold;
-                        font-size: 12px;
-                        color: white;
-                        box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-                      ">${bus.routeNumber}</div>
-                    `,
-                    className: "bus-marker",
-                    iconSize: [32, 32],
-                    iconAnchor: [16, 16],
-                  });
-
-                  return (
-                    <Marker key={bus.id} position={bus.coordinates} icon={busIcon}>
-                      <Popup>
-                        <div className="min-w-[200px]">
-                          <p className="font-bold text-center mb-2" style={{ color: bus.routeColor }}>
-                            🚌 Bus {bus.routeNumber}
-                          </p>
-                          <p className="text-sm font-semibold">{bus.routeName}</p>
-                          <div className="mt-2 pt-2 border-t border-gray-200 space-y-1 text-xs">
-                            <p><strong>Parada actual:</strong> {bus.currentStop}</p>
-                            <p><strong>Próxima parada:</strong> {bus.nextStop}</p>
-                            <p><strong>Velocidad:</strong> {bus.speed} km/h</p>
-                            <p><strong>Ocupación:</strong> {bus.passengerCount}/{bus.capacity} pasajeros</p>
-                            <p className="text-green-600 font-semibold">⏱ Llega en {bus.estimatedArrival} min</p>
-                          </div>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  );
-                })}
-              </MapContainer>
-
-              {/* Refresh button overlay */}
-              <motion.button
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.9 }}
-                onClick={getUserLocation}
-                className="absolute top-4 right-4 z-[1000] p-3 bg-card shadow-lg rounded-full border border-border"
-              >
-                <Navigation className="w-5 h-5 text-primary" />
-              </motion.button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* Nearby Routes */}
-        {userLocation && nearbyRoutes.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-4"
+            exit={{ opacity: 0, y: -10 }}
+            className="bg-destructive/10 border border-destructive/20 rounded-2xl p-4 flex items-start gap-3 text-xs"
           >
-            <div className="flex items-center gap-2">
-              <Bus className="w-5 h-5 text-primary" />
-              <h2 className="text-lg font-bold">
-                Rutas Cercanas ({nearbyRoutes.length})
-              </h2>
+            <AlertCircle className="w-4.5 h-4.5 text-destructive flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-destructive">Error de Localización</p>
+              <p className="text-destructive/80 mt-1 font-sans">{error}</p>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-            <div className="grid gap-3">
-              {nearbyRoutes.map((nearby, index) => (
-                <motion.div
-                  key={nearby.route.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.1 }}
-                  whileHover={{ scale: 1.02 }}
-                >
-                  <Link to={`/route/${nearby.route.id}`}>
-                    <div className="bg-card border border-border rounded-2xl p-4 hover:shadow-lg transition-shadow">
-                      <div className="flex items-start gap-4">
-                        {/* Route Number */}
-                        <motion.div
-                          whileHover={{ rotate: [0, -10, 10, -10, 0] }}
-                          transition={{ duration: 0.5 }}
-                          className="flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg"
-                          style={{
-                            backgroundColor: nearby.route.color,
-                            color: "white",
-                          }}
-                        >
-                          {nearby.route.number}
-                        </motion.div>
+      {/* Live Map Area */}
+      {userLocation && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.98 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="rounded-3xl overflow-hidden border border-white/5 shadow-2xl h-[360px] relative z-0"
+        >
+          <div ref={mapRef} className="w-full h-full" />
 
-                        <div className="flex-1 min-w-0">
-                          <h3 className="font-bold truncate">{nearby.route.name}</h3>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground mt-1">
-                            <MapPin className="w-4 h-4" />
-                            <span className="truncate">{nearby.nearestStop}</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm mt-2">
-                            <div className="px-2 py-1 bg-primary/10 text-primary rounded-lg font-semibold">
-                              {nearby.distance < 0.1
-                                ? "< 100m"
-                                : `${nearby.distance.toFixed(1)} km`}
-                            </div>
-                            <div className="flex items-center gap-1 text-muted-foreground">
-                              <Clock className="w-3 h-3" />
-                              <span className="text-xs">{nearby.route.frequency}</span>
-                            </div>
-                          </div>
-                        </div>
+          {/* Floating zoom/recenter overlay button */}
+          <button
+            onClick={getUserLocation}
+            aria-label="Re-centrar en mi posición"
+            className="absolute top-4 right-4 z-[997] p-2.5 bg-card border border-white/5 rounded-xl shadow-lg hover:bg-white/10 active:scale-95 transition-all text-primary focus-ring-premium"
+          >
+            <Navigation className="w-5 h-5 fill-primary/10" />
+          </button>
+        </motion.div>
+      )}
+
+      {/* Near Routes Panel list */}
+      {userLocation && nearbyRoutes.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="space-y-3.5"
+        >
+          <div className="flex items-center gap-2 px-1">
+            <Bus className="w-4 h-4 text-primary" />
+            <h2 className="text-sm font-bold uppercase tracking-wider text-[#8B8FA8] font-display">
+              Rutas En Tu Cobertura (1km)
+            </h2>
+          </div>
+
+          <div className="grid gap-3">
+            {nearbyRoutes.map((nearby, idx) => (
+              <motion.div
+                key={nearby.route.id}
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05 }}
+              >
+                <Link to={`/route/${nearby.route.id}`} className="block focus-ring-premium rounded-2xl">
+                  <div className="p-4 rounded-2xl border border-white/5 glass-panel flex items-center gap-4 hover:border-white/10 transition-colors">
+                    {/* Badge */}
+                    <div
+                      className="w-12 h-12 rounded-xl flex items-center justify-center font-bold text-white shadow-md text-sm font-mono flex-shrink-0"
+                      style={{ backgroundColor: nearby.route.color }}
+                    >
+                      {nearby.route.number}
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-bold text-[#F0F2FF] truncate font-display">
+                        {nearby.route.name}
+                      </h3>
+                      <div className="flex items-center gap-1.5 text-xs text-[#8B8FA8] mt-1 font-sans truncate">
+                        <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
+                        <span className="truncate">Parada más cercana: {nearby.nearestStop}</span>
+                      </div>
+                      
+                      <div className="flex items-center gap-3 mt-2 text-[10px] font-mono">
+                        <span className="text-primary font-bold">
+                          Distancia: {nearby.distance < 0.1 ? "< 100m" : `${nearby.distance.toFixed(2)} km`}
+                        </span>
+                        <span className="text-[#8B8FA8]">⏱ Frecuencia: {nearby.route.frequency}</span>
                       </div>
                     </div>
-                  </Link>
-                </motion.div>
-              ))}
-            </div>
-          </motion.div>
-        )}
+                  </div>
+                </Link>
+              </motion.div>
+            ))}
+          </div>
+        </motion.div>
+      )}
 
-        {/* No routes found */}
-        {userLocation && nearbyRoutes.length === 0 && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="text-center py-12 space-y-3"
-          >
-            <div className="inline-flex p-6 bg-muted/50 rounded-full">
-              <Bus className="w-12 h-12 text-muted-foreground" />
-            </div>
-            <h3 className="text-lg font-bold">No hay rutas cercanas</h3>
-            <p className="text-muted-foreground max-w-md mx-auto">
-              No encontramos rutas de buses dentro de 2 km de tu ubicación. Intenta en otra zona de la ciudad.
-            </p>
-          </motion.div>
-        )}
-      </div>
-
-      <style>{`
-        @keyframes pulse {
-          0%, 100% {
-            transform: scale(1);
-            opacity: 0.3;
-          }
-          50% {
-            transform: scale(2);
-            opacity: 0;
-          }
-        }
-      `}</style>
+      {/* No routes near */}
+      {userLocation && nearbyRoutes.length === 0 && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="text-center py-12 rounded-3xl border border-white/5 glass-panel space-y-3"
+        >
+          <div className="w-12 h-12 rounded-full bg-white/5 border border-white/5 flex items-center justify-center mx-auto text-[#8B8FA8]">
+            <Bus className="w-6 h-6 opacity-40 animate-pulse" />
+          </div>
+          <h3 className="text-sm font-bold text-[#F0F2FF] font-display">No hay rutas en tu radio</h3>
+          <p className="text-xs text-[#8B8FA8] font-sans max-w-xs mx-auto">
+            No se detectaron paraderos de buses dentro de 2 km a la redonda de tu posición GPS.
+          </p>
+        </motion.div>
+      )}
     </div>
   );
 }

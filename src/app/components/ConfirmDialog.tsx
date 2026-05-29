@@ -36,7 +36,7 @@ export function ConfirmDialog({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[1200]"
+            className="absolute inset-0 z-[1200]"
             style={{
               backgroundColor: "rgba(0, 0, 0, 0.7)",
               backdropFilter: "blur(8px)",
@@ -44,7 +44,7 @@ export function ConfirmDialog({
           />
 
           {/* Dialog */}
-          <div className="fixed inset-0 z-[1201] flex items-center justify-center p-4">
+          <div className="absolute inset-0 z-[1201] flex items-center justify-center p-4">
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}

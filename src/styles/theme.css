@@ -73,9 +73,6 @@ h1, h2, h3, h4, h5, h6 {
   background: #0D0F14 !important;
 }
 
-.leaflet-tile-pane {
-  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
-}
 
 .leaflet-popup-content-wrapper,
 .leaflet-popup-tip {
@@ -143,3 +140,60 @@ input:-webkit-autofill:focus {
   background-color: rgba(0, 229, 160, 0.3);
   color: #F0F2FF;
 }
+
+/* Glassmorphism utility classes */
+.glass-panel {
+  background: rgba(22, 24, 32, 0.7) !important;
+  backdrop-filter: blur(16px) !important;
+  -webkit-backdrop-filter: blur(16px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+}
+
+.glass-panel-light {
+  background: rgba(255, 255, 255, 0.03) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.05) !important;
+}
+
+.glass-input {
+  background: rgba(22, 24, 32, 0.5) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  color: #F0F2FF !important;
+  transition: border-color 200ms ease, box-shadow 200ms ease !important;
+}
+
+.glass-input:focus-visible {
+  border-color: #00E5A0 !important;
+  box-shadow: 0 0 15px rgba(0, 229, 160, 0.15) !important;
+  outline: none !important;
+}
+
+.glow-primary {
+  box-shadow: 0 0 24px rgba(0, 229, 160, 0.22) !important;
+}
+
+.glow-secondary {
+  box-shadow: 0 0 24px rgba(79, 142, 247, 0.22) !important;
+}
+
+/* Custom route glow card shadows */
+.route-glow-card {
+  transition: transform 250ms cubic-bezier(.23, 1, .32, 1), box-shadow 250ms cubic-bezier(.23, 1, .32, 1), border-color 250ms cubic-bezier(.23, 1, .32, 1) !important;
+}
+
+.route-glow-card:hover {
+  transform: translateY(-2px) !important;
+}
+
+/* Interactive focus ring for accessibility */
+.focus-ring-premium {
+  outline: none !important;
+}
+.focus-ring-premium:focus-visible {
+  outline: none !important;
+  box-shadow: 0 0 0 2px #0D0F14, 0 0 0 4px #00E5A0 !important;
+}

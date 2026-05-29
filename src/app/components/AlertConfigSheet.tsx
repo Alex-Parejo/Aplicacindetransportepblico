@@ -44,7 +44,7 @@ export function AlertConfigSheet({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 z-[1100]"
+            className="absolute inset-0 z-[1100]"
             style={{
               backgroundColor: "rgba(0, 0, 0, 0.7)",
               backdropFilter: "blur(4px)",
@@ -61,10 +61,10 @@ export function AlertConfigSheet({
               stiffness: 300,
               damping: 30,
             }}
-            className="fixed bottom-0 left-0 right-0 z-[1101] rounded-t-3xl overflow-hidden"
+            className="absolute bottom-0 left-0 right-0 z-[1101] rounded-t-3xl overflow-hidden"
             style={{
               backgroundColor: "#161820",
-              height: "45vh",
+              height: "45%",
               boxShadow: "0px -4px 20px rgba(0, 0, 0, 0.35)",
             }}
           >

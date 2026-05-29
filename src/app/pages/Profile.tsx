@@ -1,15 +1,27 @@
-import { User, Settings, Bell, Heart, History, HelpCircle, LogOut, ChevronRight } from "lucide-react";
-import { motion, useAnimate } from "motion/react";
+import { useEffect, useState } from "react";
+import { User, Settings, Bell, Heart, History, HelpCircle, LogOut, ChevronRight, MapPin, Award, Compass, Save, Check, Clock, Home, Briefcase, GraduationCap } from "lucide-react";
+import { motion, AnimatePresence } from "motion/react";
 import { useNavigate } from "react-router";
-import { useState } from "react";
-import { AppLogo } from "../components/AppLogo";
+import { api, type UserProfile, type UserPlace } from "../services/api";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { Toast } from "../components/Toast";
+import { AppLogo } from "../components/AppLogo";
+import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, BarChart, Bar } from "recharts";
+import { cn } from "../components/ui/utils";
 
 export function Profile() {
   const navigate = useNavigate();
-  const [scope, animate] = useAnimate();
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [activeSubTab, setActiveSubTab] = useState<"history" | "places" | "stats">("stats");
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
+  const [isEditingPlaces, setIsEditingPlaces] = useState(false);
+
+  // Form states for saved places
+  const [homePlace, setHomePlace] = useState("");
+  const [workPlace, setWorkPlace] = useState("");
+  const [univPlace, setUnivPlace] = useState("");
+
   const [toast, setToast] = useState<{
     isOpen: boolean;
     message: string;
@@ -20,345 +32,470 @@ export function Profile() {
     type: "success",
   });
 
-  // Stats with count-up animation values
-  const [stats] = useState({
-    trips: 47,
-    favorites: 3,
-    rating: 4.9,
-  });
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        setLoading(true);
+        const data = await api.getProfile();
+        setProfile(data);
+        setHomePlace(data.savedPlaces.home.address);
+        setWorkPlace(data.savedPlaces.work.address);
+        setUnivPlace(data.savedPlaces.university.address);
+      } catch (err) {
+        console.error("Error fetching profile:", err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadProfile();
+  }, []);
 
   const handleLogout = () => {
-    // Clear session and navigate to home
     navigate("/");
     setToast({
       isOpen: true,
-      message: "Sesión cerrada exitosamente",
+      message: "Sesión cerrada correctamente",
       type: "info",
     });
   };
 
-  const handlePersonalInfo = () => {
-    setToast({
-      isOpen: true,
-      message: "Funcionalidad de perfil próximamente disponible",
-      type: "info",
-    });
-  };
-
-  const handleHistory = () => {
-    setToast({
-      isOpen: true,
-      message: `Has realizado ${stats.trips} viajes. Historial completo próximamente.`,
-      type: "info",
-    });
-  };
-
-  const handleFavorites = () => {
-    navigate("/routes");
-    setToast({
-      isOpen: true,
-      message: "Selecciona rutas para añadir a favoritos",
-      type: "info",
-    });
-  };
-
-  const handleNotifications = () => {
-    setToast({
-      isOpen: true,
-      message: "Configuración de notificaciones próximamente disponible",
-      type: "info",
-    });
-  };
-
-  const handleSettings = () => {
-    setToast({
-      isOpen: true,
-      message: "Configuración avanzada próximamente disponible",
-      type: "info",
-    });
+  const handleSavePlaces = async () => {
+    if (!profile) return;
+    try {
+      const updatedProfile: UserProfile = {
+        ...profile,
+        savedPlaces: {
+          home: { ...profile.savedPlaces.home, address: homePlace },
+          work: { ...profile.savedPlaces.work, address: workPlace },
+          university: { ...profile.savedPlaces.university, address: univPlace },
+        }
+      };
+      await api.updateProfile(updatedProfile);
+      setProfile(updatedProfile);
+      setIsEditingPlaces(false);
+      setToast({
+        isOpen: true,
+        message: "¡Ubicaciones guardadas correctamente!",
+        type: "success",
+      });
+    } catch (err) {
+      console.error(err);
+      setToast({
+        isOpen: true,
+        message: "Error al guardar ubicaciones",
+        type: "error",
+      });
+    }
   };
 
   const handleHelp = () => {
-    // Abrir WhatsApp con mensaje predefinido
     const phoneNumber = "573009083555";
-    const message = encodeURIComponent("Hola, necesito ayuda con BusSamario 🚌");
+    const message = encodeURIComponent("Hola, necesito soporte técnico con BusSamario 🚌");
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-
     window.open(whatsappUrl, '_blank');
-
     setToast({
       isOpen: true,
-      message: "Abriendo WhatsApp...",
+      message: "Abriendo chat de soporte…",
       type: "success",
     });
   };
 
-  const handleRating = () => {
-    setToast({
-      isOpen: true,
-      message: `¡Excelente! Tienes ${stats.rating}⭐ de calificación como usuario`,
-      type: "success",
-    });
-  };
+  // Compute stats metrics
+  const totalTrips = profile?.history.length || 0;
+  const totalDistance = profile?.history.reduce((sum, item) => sum + item.distanceKm, 0).toFixed(1) || "0.0";
+  const favoritesCount = profile?.favorites.length || 0;
 
-  const menuItems = [
-    {
-      icon: User,
-      label: "Información personal",
-      description: "Edita tu perfil",
-      color: "#00E5A0",
-      onClick: handlePersonalInfo,
-    },
-    {
-      icon: History,
-      label: "Historial de viajes",
-      description: "Tus últimas rutas",
-      color: "#4F8EF7",
-      onClick: handleHistory,
-    },
-    {
-      icon: Heart,
-      label: "Rutas favoritas",
-      description: `${stats.favorites} rutas guardadas`,
-      color: "#FF6B6B",
-      onClick: handleFavorites,
-    },
-    {
-      icon: Bell,
-      label: "Notificaciones",
-      description: "Alertas y recordatorios",
-      color: "#EAB308",
-      onClick: handleNotifications,
-    },
-    {
-      icon: Settings,
-      label: "Configuración",
-      description: "Ajustes de la app",
-      color: "#8B8FA8",
-      onClick: handleSettings,
-    },
-    {
-      icon: HelpCircle,
-      label: "Ayuda y soporte",
-      description: "Contáctanos vía WhatsApp",
-      color: "#A855F7",
-      onClick: handleHelp,
-    },
-  ];
+  // Prepare chart data from trip logs
+  const chartData = profile?.history.map((record) => {
+    const d = new Date(record.date);
+    return {
+      name: d.toLocaleDateString("es-ES", { day: "numeric", month: "short" }),
+      distance: record.distanceKm,
+      duration: record.durationMinutes,
+    };
+  }).reverse() || [];
 
   return (
-    <div className="pb-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center justify-center mb-6">
-          <AppLogo size={60} showText={false} />
-        </div>
-
-        {/* User info card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="relative rounded-2xl p-6 overflow-hidden"
-          style={{
-            background: 'linear-gradient(135deg, #00E5A0 0%, #4F8EF7 100%)',
-            boxShadow: '0 0 40px rgba(0, 229, 160, 0.2)',
-          }}
-        >
-          {/* Animated background */}
-          <motion.div
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.6, 0.3],
-            }}
-            transition={{
-              duration: 4,
-              repeat: Infinity,
-              ease: "easeInOut",
-              type: "keyframes",
-            }}
-            className="absolute -right-10 -top-10 w-40 h-40 bg-white/20 rounded-full blur-3xl"
-          />
-
-          <div className="relative z-10 flex items-center gap-4">
-            {/* Avatar */}
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-sm border-2 border-white/40"
-            >
-              <User className="w-8 h-8 text-white" />
-            </div>
-
-            {/* User info */}
-            <div className="flex-1">
-              <h2
-                className="text-xl font-bold text-white mb-1"
-                style={{ fontFamily: 'var(--font-display)' }}
-              >
-                Viajero Samario
-              </h2>
-              <p className="text-sm text-white/80">
-                Miembro desde Mayo 2026
-              </p>
-            </div>
-
-            {/* Edit button */}
-            <button
-              onClick={handleSettings}
-              className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-            >
-              <Settings className="w-5 h-5 text-white" />
-            </button>
-          </div>
-
-          {/* Stats */}
-          <div className="mt-6 grid grid-cols-3 gap-4">
-            <button
-              onClick={handleHistory}
-              className="text-center hover:opacity-80 transition-opacity"
-            >
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.8 }}
-                className="text-2xl font-bold text-white mb-1"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {stats.trips}
-              </motion.p>
-              <p className="text-xs text-white/80">Viajes</p>
-            </button>
-            <button
-              onClick={handleFavorites}
-              className="text-center hover:opacity-80 transition-opacity"
-            >
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4, duration: 0.8 }}
-                className="text-2xl font-bold text-white mb-1"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                {stats.favorites}
-              </motion.p>
-              <p className="text-xs text-white/80">Favoritas</p>
-            </button>
-            <button
-              onClick={handleRating}
-              className="text-center hover:opacity-80 transition-opacity"
-            >
-              <motion.p
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, duration: 0.8 }}
-                className="text-2xl font-bold text-white mb-1"
-                style={{ fontFamily: 'var(--font-mono)' }}
-              >
-                ★ {stats.rating}
-              </motion.p>
-              <p className="text-xs text-white/80">Rating</p>
-            </button>
-          </div>
-        </motion.div>
+    <div className="pb-24 max-w-2xl mx-auto space-y-6">
+      {/* Header Profile Title */}
+      <div className="text-center md:text-left">
+        <h1 className="text-2xl md:text-3xl font-extrabold text-[#F0F2FF] font-display">
+          Mi Cuenta
+        </h1>
+        <p className="text-xs text-[#8B8FA8] font-sans mt-1">
+          Administra tus datos, ubicaciones y estadísticas de transporte
+        </p>
       </div>
 
-      {/* Menu items */}
-      <div className="space-y-3">
-        {menuItems.map((item, index) => {
-          const Icon = item.icon;
+      {loading ? (
+        // Shimmer Profile Card
+        <div className="h-52 w-full rounded-3xl bg-white/5 border border-white/[0.03] animate-pulse" />
+      ) : (
+        profile && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative rounded-3xl p-6 overflow-hidden border border-white/5 glass-panel"
+          >
+            {/* Ambient Background Gradient */}
+            <div className="absolute -right-24 -top-24 w-52 h-52 rounded-full bg-gradient-to-br from-[#00E5A0]/20 to-[#4F8EF7]/20 blur-[100px]" />
 
-          return (
-            <motion.button
-              key={item.label}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-              whileHover={{ scale: 0.98, x: 5 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={item.onClick}
-              className="w-full rounded-xl p-4 border flex items-center gap-4 group"
-              style={{
-                backgroundColor: '#161820',
-                borderColor: 'rgba(255, 255, 255, 0.06)',
-              }}
-            >
-              {/* Icon */}
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{
-                  backgroundColor: `${item.color}15`,
-                }}
-              >
-                <Icon className="w-5 h-5" style={{ color: item.color }} />
+            <div className="relative z-10 flex items-center gap-4">
+              {/* Avatar image */}
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-primary/40 relative shadow-lg">
+                <img
+                  src={profile.avatar}
+                  alt="Avatar del usuario"
+                  className="w-full h-full object-cover"
+                />
               </div>
 
-              {/* Content */}
-              <div className="flex-1 text-left min-w-0">
-                <h3
-                  className="font-bold mb-0.5"
-                  style={{
-                    fontFamily: 'var(--font-display)',
-                    color: '#F0F2FF',
-                  }}
-                >
-                  {item.label}
-                </h3>
-                <p className="text-xs" style={{ color: '#8B8FA8' }}>
-                  {item.description}
+              {/* Identity info */}
+              <div className="flex-1 min-w-0">
+                <h2 className="text-lg font-bold text-[#F0F2FF] font-display truncate">
+                  {profile.name}
+                </h2>
+                <p className="text-xs text-[#8B8FA8] font-mono truncate">{profile.email}</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <Award className="w-3.5 h-3.5 text-[#00E5A0]" />
+                  <span className="text-[10px] text-[#00E5A0] font-bold uppercase tracking-wider font-display">
+                    Viajero Samario Pro
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Profile statistics row */}
+            <div className="mt-6 pt-5 border-t border-white/[0.03] grid grid-cols-3 gap-2">
+              <div className="text-center space-y-1">
+                <p className="text-xl font-bold font-mono text-[#F0F2FF] leading-none">
+                  {totalTrips}
+                </p>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-[#8B8FA8] font-display">
+                  Viajes
                 </p>
               </div>
+              <div className="text-center space-y-1 border-x border-white/[0.03]">
+                <p className="text-xl font-bold font-mono text-[#00E5A0] leading-none">
+                  {totalDistance} km
+                </p>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-[#8B8FA8] font-display">
+                  Distancia Total
+                </p>
+              </div>
+              <div className="text-center space-y-1">
+                <p className="text-xl font-bold font-mono text-[#4F8EF7] leading-none">
+                  {favoritesCount}
+                </p>
+                <p className="text-[10px] uppercase font-bold tracking-wider text-[#8B8FA8] font-display">
+                  Favoritos
+                </p>
+              </div>
+            </div>
+          </motion.div>
+        )
+      )}
 
-              {/* Arrow */}
-              <ChevronRight
-                className="w-5 h-5 flex-shrink-0 transition-transform group-hover:translate-x-1"
-                style={{ color: '#8B8FA8' }}
-              />
-            </motion.button>
-          );
-        })}
+      {/* Subtabs Navigation */}
+      <div className="flex p-1 rounded-xl bg-white/5 border border-white/[0.03] select-none text-xs font-bold text-center">
+        <button
+          onClick={() => setActiveSubTab("stats")}
+          className={cn(
+            "flex-1 py-2 rounded-lg transition-all focus-ring-premium",
+            activeSubTab === "stats" ? "bg-white/10 text-white shadow-sm" : "text-[#8B8FA8] hover:text-[#F0F2FF]"
+          )}
+        >
+          Estadísticas
+        </button>
+        <button
+          onClick={() => setActiveSubTab("places")}
+          className={cn(
+            "flex-1 py-2 rounded-lg transition-all focus-ring-premium",
+            activeSubTab === "places" ? "bg-white/10 text-white shadow-sm" : "text-[#8B8FA8] hover:text-[#F0F2FF]"
+          )}
+        >
+          Direcciones
+        </button>
+        <button
+          onClick={() => setActiveSubTab("history")}
+          className={cn(
+            "flex-1 py-2 rounded-lg transition-all focus-ring-premium",
+            activeSubTab === "history" ? "bg-white/10 text-white shadow-sm" : "text-[#8B8FA8] hover:text-[#F0F2FF]"
+          )}
+        >
+          Historial
+        </button>
       </div>
 
-      {/* Logout button */}
-      <motion.button
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        whileTap={{ scale: 0.96 }}
-        onClick={() => setShowLogoutDialog(true)}
-        className="w-full mt-6 p-4 rounded-xl border flex items-center justify-center gap-3"
-        style={{
-          backgroundColor: 'rgba(255, 107, 107, 0.1)',
-          borderColor: 'rgba(255, 107, 107, 0.3)',
-        }}
-      >
-        <LogOut className="w-5 h-5" style={{ color: '#FF6B6B' }} />
-        <span
-          className="font-bold"
-          style={{
-            fontFamily: 'var(--font-display)',
-            color: '#FF6B6B',
-          }}
+      {/* Dynamic Subtabs Panels */}
+      <div className="min-h-[220px]">
+        {activeSubTab === "stats" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-3xl border border-white/5 p-5 glass-panel space-y-4"
+          >
+            <div className="flex justify-between items-center">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B8FA8] font-display">
+                Distancia Recorrida (Km por viaje)
+              </h3>
+              <span className="text-[10px] font-bold text-[#00E5A0] font-mono uppercase bg-[#00E5A0]/10 px-2 py-0.5 rounded-full">
+                Distancia
+              </span>
+            </div>
+
+            {chartData.length > 1 ? (
+              <div className="h-44 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData} margin={{ top: 10, right: 5, left: -25, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="colorDistance" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#00E5A0" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#00E5A0" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="name" stroke="#4A4D60" fontSize={10} tickLine={false} />
+                    <YAxis stroke="#4A4D60" fontSize={10} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{
+                        backgroundColor: "#131520",
+                        borderColor: "rgba(255, 255, 255, 0.08)",
+                        borderRadius: "12px",
+                        fontFamily: "var(--font-body)",
+                        fontSize: "11px",
+                        color: "#F0F2FF"
+                      }}
+                      labelClassName="font-bold"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey="distance"
+                      stroke="#00E5A0"
+                      strokeWidth={2.5}
+                      fillOpacity={1}
+                      fill="url(#colorDistance)"
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            ) : (
+              <div className="h-44 flex items-center justify-center border border-dashed border-white/10 rounded-2xl">
+                <p className="text-xs text-[#8B8FA8] font-sans">
+                  Realiza más viajes para generar gráficos de rendimiento…
+                </p>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {activeSubTab === "places" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="rounded-3xl border border-white/5 p-5 glass-panel space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-[#8B8FA8] font-display">
+                Direcciones Guardadas
+              </h3>
+              
+              {!isEditingPlaces ? (
+                <button
+                  onClick={() => setIsEditingPlaces(true)}
+                  className="text-xs font-semibold text-[#00E5A0] hover:underline px-1 py-0.5 focus-ring-premium rounded"
+                >
+                  Editar
+                </button>
+              ) : (
+                <button
+                  onClick={handleSavePlaces}
+                  className="flex items-center gap-1 text-xs font-bold text-[#00E5A0] bg-[#00E5A0]/10 border border-[#00E5A0]/25 px-2.5 py-1 rounded-lg focus-ring-premium"
+                >
+                  <Save className="w-3.5 h-3.5" />
+                  Guardar
+                </button>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              {/* Casa */}
+              <div className="flex gap-3 items-start border-b border-white/[0.03] pb-3">
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <Home className="w-4 h-4 text-[#8B8FA8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-[#F0F2FF] font-display block">Casa</span>
+                  {isEditingPlaces ? (
+                    <input
+                      type="text"
+                      value={homePlace}
+                      onChange={(e) => setHomePlace(e.target.value)}
+                      className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none focus:border-[#00E5A0] transition-colors font-sans"
+                    />
+                  ) : (
+                    <p className="text-xs text-[#8B8FA8] truncate font-sans mt-0.5">
+                      {profile?.savedPlaces.home.address || "No configurado"}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Trabajo */}
+              <div className="flex gap-3 items-start border-b border-white/[0.03] pb-3">
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <Briefcase className="w-4 h-4 text-[#8B8FA8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-[#F0F2FF] font-display block">Trabajo</span>
+                  {isEditingPlaces ? (
+                    <input
+                      type="text"
+                      value={workPlace}
+                      onChange={(e) => setWorkPlace(e.target.value)}
+                      className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none focus:border-[#00E5A0] transition-colors font-sans"
+                    />
+                  ) : (
+                    <p className="text-xs text-[#8B8FA8] truncate font-sans mt-0.5">
+                      {profile?.savedPlaces.work.address || "No configurado"}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Universidad */}
+              <div className="flex gap-3 items-start">
+                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center flex-shrink-0">
+                  <GraduationCap className="w-4 h-4 text-[#8B8FA8]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs font-bold text-[#F0F2FF] font-display block">Universidad</span>
+                  {isEditingPlaces ? (
+                    <input
+                      type="text"
+                      value={univPlace}
+                      onChange={(e) => setUnivPlace(e.target.value)}
+                      className="w-full mt-1 px-3 py-1.5 rounded-lg text-xs bg-white/5 border border-white/10 text-white outline-none focus:border-[#00E5A0] transition-colors font-sans"
+                    />
+                  ) : (
+                    <p className="text-xs text-[#8B8FA8] truncate font-sans mt-0.5">
+                      {profile?.savedPlaces.university.address || "No configurado"}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {activeSubTab === "history" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="space-y-2.5 max-h-[350px] overflow-y-auto pr-1 scrollbar-hide"
+          >
+            {profile?.history && profile.history.length > 0 ? (
+              profile.history.map((record) => {
+                const dateObj = new Date(record.date);
+                const formatTime = dateObj.toLocaleTimeString("es-ES", { hour: "numeric", minute: "2-digit" });
+                const formatDate = dateObj.toLocaleDateString("es-ES", { day: "numeric", month: "short" });
+                
+                return (
+                  <div
+                    key={record.id}
+                    className="p-3 rounded-2xl border border-white/5 glass-panel flex items-center gap-3 relative"
+                  >
+                    {/* Tiny route indicator strip */}
+                    <div className="w-1.5 self-stretch rounded-full" style={{ backgroundColor: record.routeColor }} />
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold text-[#FF6B6B] uppercase font-mono tracking-wider">
+                          Ruta {record.routeNumber}
+                        </span>
+                        <span className="text-[9px] text-[#4A4D60] font-mono">
+                          {formatDate} a las {formatTime}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-[#F0F2FF] font-display truncate mt-0.5">
+                        {record.from} → {record.to}
+                      </p>
+                      <div className="flex items-center gap-3 mt-1.5 text-[10px] text-[#8B8FA8] font-mono">
+                        <span className="flex items-center gap-1">
+                          <Clock className="w-3 h-3 text-[#8B8FA8]" />
+                          {record.durationMinutes} min
+                        </span>
+                        <span className="flex items-center gap-1 text-[#00E5A0]">
+                          <MapPin className="w-3 h-3 text-[#00E5A0]" />
+                          {record.distanceKm} km
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="rounded-3xl border border-white/5 glass-panel p-8 text-center">
+                <p className="text-xs text-[#8B8FA8]">No se registran viajes en tu historial…</p>
+              </div>
+            )}
+          </motion.div>
+        )}
+      </div>
+
+      {/* Support & Settings Links list */}
+      <div className="space-y-2.5 select-none">
+        <button
+          onClick={handleHelp}
+          className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-white/5 glass-panel-light text-left group focus-ring-premium"
         >
-          Cerrar sesión
-        </span>
-      </motion.button>
+          <div className="w-10 h-10 rounded-xl bg-purple-500/10 flex items-center justify-center flex-shrink-0 text-purple-400">
+            <HelpCircle className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-bold text-[#F0F2FF] font-display">Ayuda y Soporte</h4>
+            <p className="text-[10px] text-[#8B8FA8] mt-0.5">Comunícate con nuestro equipo vía WhatsApp</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-[#4A4D60] group-hover:translate-x-0.5 transition-transform" />
+        </button>
 
-      {/* Version */}
-      <p className="text-center text-xs mt-6" style={{ color: '#4A4D60' }}>
-        BusSamario v2.1 · Hecho con ❤️ en Santa Marta
-      </p>
+        <button
+          onClick={() => setShowLogoutDialog(true)}
+          className="w-full flex items-center gap-3.5 p-3 rounded-2xl border border-red-500/10 bg-red-500/5 text-left group focus-ring-premium"
+        >
+          <div className="w-10 h-10 rounded-xl bg-red-500/10 flex items-center justify-center flex-shrink-0 text-[#FF6B6B]">
+            <LogOut className="w-5 h-5" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-bold text-[#FF6B6B] font-display">Cerrar Sesión</h4>
+            <p className="text-[10px] text-red-500/50 mt-0.5">Salir de tu cuenta viajera local</p>
+          </div>
+          <ChevronRight className="w-4 h-4 text-red-500/40 group-hover:translate-x-0.5 transition-transform" />
+        </button>
+      </div>
 
-      {/* Logout confirmation dialog */}
+      {/* App Version footer */}
+      <div className="text-center space-y-1 select-none">
+        <p className="text-[10px] font-mono text-[#4A4D60]">
+          BusSamario Premium v3.0
+        </p>
+        <p className="text-[9px] text-[#4A4D60] font-sans">
+          Hecho con ❤️ para la movilidad urbana sostenible de Santa Marta
+        </p>
+      </div>
+
+      {/* Confirm dialogues */}
       <ConfirmDialog
         isOpen={showLogoutDialog}
         onClose={() => setShowLogoutDialog(false)}
         onConfirm={handleLogout}
         title="¿Cerrar sesión?"
-        message="Deberás ingresar nuevamente."
-        confirmText="Cerrar sesión →"
+        message="¿Estás seguro de cerrar sesión? Tu perfil local de viajes se mantendrá guardado."
+        confirmText="Cerrar Sesión"
         cancelText="Cancelar"
         variant="destructive"
       />
 
-      {/* Toast notifications */}
+      {/* Toast popup */}
       <Toast
         isOpen={toast.isOpen}
         onClose={() => setToast({ ...toast, isOpen: false })}

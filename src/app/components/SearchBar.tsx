@@ -1,16 +1,18 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Clock } from "lucide-react";
+import { Search, X, Clock, Navigation, Bus, MapPin } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { busRoutes, busStops } from "../data/routes";
+import { cn } from "./ui/utils";
 
 interface SearchBarProps {
   onResultSelect?: (type: "route" | "stop" | "sector", id: string) => void;
+  className?: string;
 }
 
 const placeholders = [
-  "Buscar ruta...",
-  "Buscar paradero...",
-  "¿A dónde vas?",
+  "Buscar ruta…",
+  "Buscar paradero…",
+  "¿A dónde vas?…",
 ];
 
 const sectors = [
@@ -21,38 +23,54 @@ const sectors = [
   { id: "gaira", name: "Gaira", description: "Pueblo cercano" },
 ];
 
-export function SearchBar({ onResultSelect }: SearchBarProps) {
+export function SearchBar({ onResultSelect, className }: SearchBarProps) {
   const [isFocused, setIsFocused] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [recentSearches, setRecentSearches] = useState<string[]>([
-    "Centro - Rodadero",
-    "Terminal de Transportes",
-    "Taganga",
-  ]);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    const saved = localStorage.getItem("bussamario_recent_searches");
+    return saved ? JSON.parse(saved) : ["Centro - Rodadero", "Terminal de Transportes", "Taganga"];
+  });
   const [showResults, setShowResults] = useState(false);
+  const [activeItemIndex, setActiveItemIndex] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // Animated placeholder
+  // Rotate placeholders
   useEffect(() => {
     const interval = setInterval(() => {
       setPlaceholderIndex((prev) => (prev + 1) % placeholders.length);
-    }, 2500);
-
+    }, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Show results after typing
+  // Save recent searches
+  useEffect(() => {
+    localStorage.setItem("bussamario_recent_searches", JSON.stringify(recentSearches));
+  }, [recentSearches]);
+
+  // Show results panel when searchTerm changes
   useEffect(() => {
     if (searchTerm.length > 0) {
-      const timer = setTimeout(() => setShowResults(true), 200);
-      return () => clearTimeout(timer);
+      setShowResults(true);
     } else {
       setShowResults(false);
     }
+    setActiveItemIndex(-1); // Reset keyboard nav index
   }, [searchTerm]);
 
-  // Filter results
+  // Close results panel on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsFocused(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Filtering results
   const filteredRoutes = busRoutes.filter(
     (route) =>
       route.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -68,10 +86,11 @@ export function SearchBar({ onResultSelect }: SearchBarProps) {
     sector.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const hasResults =
-    filteredRoutes.length > 0 ||
-    filteredStops.length > 0 ||
-    filteredSectors.length > 0;
+  const allFilteredResults = [
+    ...filteredRoutes.map(r => ({ ...r, type: "route" as const, label: r.name })),
+    ...filteredStops.map(s => ({ ...s, type: "stop" as const, label: s.name })),
+    ...filteredSectors.map(sec => ({ ...sec, type: "sector" as const, label: sec.name }))
+  ];
 
   const handleClear = () => {
     setSearchTerm("");
@@ -83,7 +102,6 @@ export function SearchBar({ onResultSelect }: SearchBarProps) {
     id: string,
     label: string
   ) => {
-    // Add to recent searches
     setRecentSearches((prev) => {
       const filtered = prev.filter((s) => s !== label);
       return [label, ...filtered].slice(0, 5);
@@ -91,10 +109,37 @@ export function SearchBar({ onResultSelect }: SearchBarProps) {
 
     setSearchTerm("");
     setShowResults(false);
+    setIsFocused(false);
+    inputRef.current?.blur();
     onResultSelect?.(type, id);
   };
 
-  const handleRemoveRecent = (search: string) => {
+  // Keyboard navigation
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!isFocused) return;
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveItemIndex((prev) => 
+        prev < allFilteredResults.length - 1 ? prev + 1 : prev
+      );
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveItemIndex((prev) => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      if (activeItemIndex >= 0 && activeItemIndex < allFilteredResults.length) {
+        const selected = allFilteredResults[activeItemIndex];
+        handleSelectResult(selected.type, selected.id, selected.label);
+      }
+    } else if (e.key === "Escape") {
+      setIsFocused(false);
+      inputRef.current?.blur();
+    }
+  };
+
+  const handleRemoveRecent = (e: React.MouseEvent, search: string) => {
+    e.stopPropagation();
     setRecentSearches((prev) => prev.filter((s) => s !== search));
   };
 
@@ -103,57 +148,55 @@ export function SearchBar({ onResultSelect }: SearchBarProps) {
   };
 
   return (
-    <div className="relative">
-      {/* Search input */}
+    <div ref={containerRef} className={cn("relative w-full z-[1000]", className)}>
+      {/* Search Input Container */}
       <div
-        className="flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all"
-        style={{
-          backgroundColor: isFocused ? "#1E2029" : "#161820",
-          borderColor: isFocused ? "#00E5A0" : "rgba(255, 255, 255, 0.09)",
-          boxShadow: isFocused
-            ? "0 0 0 3px rgba(0, 229, 160, 0.15)"
-            : "none",
-        }}
+        className={cn(
+          "flex items-center gap-3 px-4 py-3 rounded-2xl glass-panel border transition-all duration-300",
+          isFocused ? "border-[#00E5A0]/40 glow-primary" : "border-white/5"
+        )}
       >
         <Search
-          className="w-5 h-5 transition-colors"
-          style={{ color: isFocused ? "#00E5A0" : "#8B8FA8" }}
+          className={cn("w-5 h-5 transition-colors duration-300", isFocused ? "text-[#00E5A0]" : "text-[#4A4D60]")}
+          aria-hidden="true"
         />
-        <input
-          ref={inputRef}
-          type="text"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setTimeout(() => setIsFocused(false), 200)}
-          className="flex-1 bg-transparent border-none outline-none"
-          style={{
-            fontFamily: "var(--font-body)",
-            color: "#F0F2FF",
-          }}
-        />
+        <div className="flex-1 relative flex items-center h-6">
+          <input
+            ref={inputRef}
+            type="text"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={isFocused}
+            aria-haspopup="listbox"
+            aria-label="Buscar rutas, paradas o sectores de autobús"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            onFocus={() => setIsFocused(true)}
+            onKeyDown={handleKeyDown}
+            className="w-full bg-transparent border-none outline-none text-[#F0F2FF] font-sans text-sm focus:ring-0 placeholder-transparent"
+          />
 
-        {/* Animated placeholder */}
-        {!searchTerm && !isFocused && (
-          <AnimatePresence mode="wait">
-            <motion.span
-              key={placeholderIndex}
-              initial={{ opacity: 0, y: 5 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -5 }}
-              transition={{ duration: 0.3 }}
-              className="absolute left-12 pointer-events-none"
-              style={{
-                color: "#8B8FA8",
-                fontFamily: "var(--font-body)",
-              }}
+          {/* Animated custom placeholder */}
+          {!searchTerm && (
+            <span
+              className="absolute left-0 pointer-events-none text-sm text-[#4A4D60] font-sans flex items-center gap-1.5 transition-all duration-300"
             >
-              {placeholders[placeholderIndex]}
-            </motion.span>
-          </AnimatePresence>
-        )}
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={placeholderIndex}
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  {placeholders[placeholderIndex]}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+          )}
+        </div>
 
-        {/* Clear button */}
+        {/* Clear input button */}
         <AnimatePresence>
           {searchTerm && (
             <motion.button
@@ -161,241 +204,211 @@ export function SearchBar({ onResultSelect }: SearchBarProps) {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
               onClick={handleClear}
-              className="w-6 h-6 rounded-full flex items-center justify-center hover:bg-surface-2 transition-colors"
+              aria-label="Borrar texto de búsqueda"
+              className="w-6 h-6 rounded-full flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors focus-ring-premium"
             >
-              <X className="w-4 h-4" style={{ color: "#8B8FA8" }} />
+              <X className="w-3.5 h-3.5 text-[#8B8FA8]" />
             </motion.button>
           )}
         </AnimatePresence>
       </div>
 
-      {/* Results panel */}
+      {/* Results Panel */}
       <AnimatePresence>
         {isFocused && (showResults || searchTerm.length === 0) && (
           <motion.div
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 8 }}
-            transition={{ duration: 0.2 }}
-            className="absolute top-full left-0 right-0 mt-2 rounded-xl border overflow-hidden max-h-96 overflow-y-auto"
-            style={{
-              backgroundColor: "#161820",
-              borderColor: "rgba(255, 255, 255, 0.09)",
-              boxShadow: "var(--shadow-card)",
-              zIndex: 1000,
-            }}
+            transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+            className="absolute top-full left-0 right-0 mt-2 max-h-[380px] overflow-y-auto rounded-2xl glass-panel border border-white/10 shadow-2xl p-4 space-y-4 scrollbar-hide"
           >
             {searchTerm.length === 0 ? (
-              // Recent searches
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <p
-                    className="text-sm font-medium"
-                    style={{ color: "#8B8FA8" }}
-                  >
-                    Búsquedas recientes
-                  </p>
+              // Búsquedas recientes
+              <div role="region" aria-label="Búsquedas recientes">
+                <div className="flex items-center justify-between mb-3 px-1">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#4A4D60] font-display">
+                    Búsquedas Recientes
+                  </span>
                   {recentSearches.length > 0 && (
                     <button
                       onClick={handleClearAllRecent}
-                      className="text-xs"
-                      style={{ color: "#4F8EF7" }}
+                      className="text-xs font-semibold text-[#4F8EF7] hover:text-[#4F8EF7]/80 hover:underline focus-ring-premium rounded px-1.5 py-0.5"
                     >
-                      Limpiar todo
+                      Borrar todo
                     </button>
                   )}
                 </div>
 
                 {recentSearches.length === 0 ? (
-                  <p className="text-sm text-center py-4" style={{ color: "#4A4D60" }}>
-                    No hay búsquedas recientes
+                  <p className="text-xs text-[#4A4D60] text-center py-6 font-sans">
+                    No tienes búsquedas recientes…
                   </p>
                 ) : (
-                  <div className="space-y-2">
-                    {recentSearches.map((search, index) => (
-                      <motion.div
+                  <div className="space-y-1">
+                    {recentSearches.map((search) => (
+                      <div
                         key={search}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-surface-2 transition-colors group"
+                        onClick={() => {
+                          // Find corresponding item if it is a stop, route or sector
+                          const route = busRoutes.find(r => r.name === search);
+                          const stop = busStops.find(s => s.name === search);
+                          const sector = sectors.find(s => s.name === search);
+                          if (route) handleSelectResult("route", route.id, route.name);
+                          else if (stop) handleSelectResult("stop", stop.id, stop.name);
+                          else if (sector) handleSelectResult("sector", sector.id, sector.name);
+                          else handleSelectResult("route", "1", search); // fallback
+                        }}
+                        className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 cursor-pointer transition-colors group focus-ring-premium"
                       >
-                        <Clock className="w-4 h-4" style={{ color: "#4A4D60" }} />
-                        <span
-                          className="flex-1 text-sm"
-                          style={{ color: "#F0F2FF" }}
-                        >
+                        <Clock className="w-4 h-4 text-[#4A4D60]" aria-hidden="true" />
+                        <span className="flex-1 text-sm text-[#8B8FA8] group-hover:text-[#F0F2FF] font-sans">
                           {search}
                         </span>
                         <button
-                          onClick={() => handleRemoveRecent(search)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={(e) => handleRemoveRecent(e, search)}
+                          aria-label={`Eliminar búsqueda ${search}`}
+                          className="opacity-0 group-hover:opacity-100 p-1 hover:bg-white/10 rounded-lg transition-all focus-ring-premium"
                         >
-                          <X className="w-4 h-4" style={{ color: "#8B8FA8" }} />
+                          <X className="w-3.5 h-3.5 text-[#4A4D60]" />
                         </button>
-                      </motion.div>
+                      </div>
                     ))}
                   </div>
                 )}
               </div>
-            ) : hasResults ? (
-              // Search results
-              <div className="p-4 space-y-4">
-                {/* Routes section */}
+            ) : allFilteredResults.length > 0 ? (
+              // Resultados filtrados
+              <div role="listbox" aria-label="Resultados de búsqueda" className="space-y-4">
+                {/* Agrupación de rutas */}
                 {filteredRoutes.length > 0 && (
                   <div>
-                    <p
-                      className="text-xs font-bold mb-2 uppercase tracking-wider"
-                      style={{ color: "#4A4D60" }}
-                    >
-                      🚌 RUTAS ({filteredRoutes.length})
-                    </p>
-                    <div className="space-y-2">
-                      {filteredRoutes.map((route) => (
-                        <motion.button
-                          key={route.id}
-                          whileHover={{ scale: 0.98, x: 3 }}
-                          onClick={() =>
-                            handleSelectResult("route", route.id, route.name)
-                          }
-                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-surface-2 transition-colors text-left"
-                        >
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A4D60] font-display mb-2 px-1">
+                      Rutas de autobús
+                    </h3>
+                    <div className="space-y-1">
+                      {filteredRoutes.map((route) => {
+                        const index = allFilteredResults.findIndex(r => r.id === route.id && r.type === "route");
+                        const isKeyboardActive = activeItemIndex === index;
+                        return (
                           <div
-                            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: route.color }}
+                            key={route.id}
+                            role="option"
+                            aria-selected={isKeyboardActive}
+                            onClick={() => handleSelectResult("route", route.id, route.name)}
+                            className={cn(
+                              "flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer text-left border border-transparent",
+                              isKeyboardActive ? "bg-white/10 border-white/5" : "hover:bg-white/5"
+                            )}
                           >
-                            <span
-                              className="text-sm font-bold text-white"
-                              style={{ fontFamily: "var(--font-mono)" }}
+                            <div
+                              className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 font-mono font-bold text-xs shadow-lg text-white"
+                              style={{ backgroundColor: route.color }}
                             >
                               {route.number}
-                            </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-[#F0F2FF] truncate font-display">
+                                {route.name}
+                              </p>
+                              <p className="text-xs text-[#8B8FA8] font-mono">
+                                Tarifa: {route.fare} · {route.frequency}
+                              </p>
+                            </div>
+                            <Bus className="w-4 h-4 text-[#4A4D60]" aria-hidden="true" />
                           </div>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="font-bold text-sm truncate"
-                              style={{ color: "#F0F2FF" }}
-                            >
-                              {route.name}
-                            </p>
-                            <p
-                              className="text-xs"
-                              style={{ color: "#8B8FA8" }}
-                            >
-                              {route.fare}
-                            </p>
-                          </div>
-                          <span style={{ color: "#00E5A0" }}>→</span>
-                        </motion.button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Stops section */}
+                {/* Agrupación de paraderos */}
                 {filteredStops.length > 0 && (
                   <div>
-                    <p
-                      className="text-xs font-bold mb-2 uppercase tracking-wider"
-                      style={{ color: "#4A4D60" }}
-                    >
-                      📍 PARADEROS ({filteredStops.length})
-                    </p>
-                    <div className="space-y-2">
-                      {filteredStops.map((stop) => (
-                        <motion.button
-                          key={stop.id}
-                          whileHover={{ scale: 0.98, x: 3 }}
-                          onClick={() =>
-                            handleSelectResult("stop", stop.id, stop.name)
-                          }
-                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-surface-2 transition-colors text-left"
-                        >
-                          <span style={{ fontSize: "20px" }}>📌</span>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="font-bold text-sm truncate"
-                              style={{ color: "#F0F2FF" }}
-                            >
-                              {stop.name}
-                            </p>
-                            <p
-                              className="text-xs"
-                              style={{ color: "#8B8FA8" }}
-                            >
-                              · {stop.location}
-                            </p>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A4D60] font-display mb-2 px-1">
+                      Paraderos
+                    </h3>
+                    <div className="space-y-1">
+                      {filteredStops.map((stop) => {
+                        const index = allFilteredResults.findIndex(s => s.id === stop.id && s.type === "stop");
+                        const isKeyboardActive = activeItemIndex === index;
+                        return (
+                          <div
+                            key={stop.id}
+                            role="option"
+                            aria-selected={isKeyboardActive}
+                            onClick={() => handleSelectResult("stop", stop.id, stop.name)}
+                            className={cn(
+                              "flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer text-left border border-transparent",
+                              isKeyboardActive ? "bg-white/10 border-white/5" : "hover:bg-white/5"
+                            )}
+                          >
+                            <div className="w-9 h-9 rounded-lg bg-secondary/15 flex items-center justify-center flex-shrink-0">
+                              <MapPin className="w-4 h-4 text-[#4F8EF7]" aria-hidden="true" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-[#F0F2FF] truncate font-display">
+                                {stop.name}
+                              </p>
+                              <p className="text-xs text-[#8B8FA8] truncate font-sans">
+                                {stop.location}
+                              </p>
+                            </div>
+                            <Navigation className="w-4 h-4 text-[#4A4D60]" aria-hidden="true" />
                           </div>
-                          <span style={{ color: "#00E5A0" }}>→</span>
-                        </motion.button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
 
-                {/* Sectors section */}
+                {/* Agrupación de sectores */}
                 {filteredSectors.length > 0 && (
                   <div>
-                    <p
-                      className="text-xs font-bold mb-2 uppercase tracking-wider"
-                      style={{ color: "#4A4D60" }}
-                    >
-                      🗺️ SECTORES ({filteredSectors.length})
-                    </p>
-                    <div className="space-y-2">
-                      {filteredSectors.map((sector) => (
-                        <motion.button
-                          key={sector.id}
-                          whileHover={{ scale: 0.98, x: 3 }}
-                          onClick={() =>
-                            handleSelectResult("sector", sector.id, sector.name)
-                          }
-                          className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-surface-2 transition-colors text-left"
-                        >
-                          <span style={{ fontSize: "20px" }}>🏙️</span>
-                          <div className="flex-1 min-w-0">
-                            <p
-                              className="font-bold text-sm truncate"
-                              style={{ color: "#F0F2FF" }}
-                            >
-                              {sector.name}
-                            </p>
-                            <p
-                              className="text-xs"
-                              style={{ color: "#8B8FA8" }}
-                            >
-                              · {sector.description}
-                            </p>
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-[#4A4D60] font-display mb-2 px-1">
+                      Sectores
+                    </h3>
+                    <div className="space-y-1">
+                      {filteredSectors.map((sector) => {
+                        const index = allFilteredResults.findIndex(sec => sec.id === sector.id && sec.type === "sector");
+                        const isKeyboardActive = activeItemIndex === index;
+                        return (
+                          <div
+                            key={sector.id}
+                            role="option"
+                            aria-selected={isKeyboardActive}
+                            onClick={() => handleSelectResult("sector", sector.id, sector.name)}
+                            className={cn(
+                              "flex items-center gap-3 p-2 rounded-xl transition-all cursor-pointer text-left border border-transparent",
+                              isKeyboardActive ? "bg-white/10 border-white/5" : "hover:bg-white/5"
+                            )}
+                          >
+                            <div className="w-9 h-9 rounded-lg bg-[#00E5A0]/10 flex items-center justify-center flex-shrink-0">
+                              <Compass className="w-4 h-4 text-[#00E5A0]" aria-hidden="true" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-bold text-sm text-[#F0F2FF] truncate font-display">
+                                {sector.name}
+                              </p>
+                              <p className="text-xs text-[#8B8FA8] truncate font-sans">
+                                {sector.description}
+                              </p>
+                            </div>
                           </div>
-                          <span style={{ color: "#00E5A0" }}>→</span>
-                        </motion.button>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-              // Empty state
-              <div className="p-8 text-center">
-                <motion.div
-                  animate={{
-                    rotate: [0, 10, -10, 0],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                  }}
-                >
-                  <Search
-                    className="w-12 h-12 mx-auto mb-3 opacity-30"
-                    style={{ color: "#8B8FA8" }}
-                  />
-                </motion.div>
-                <p className="text-sm" style={{ color: "#8B8FA8" }}>
-                  No encontramos esa ruta.
-                  <br />
-                  Prueba con otro nombre.
+              // Búsqueda sin resultados
+              <div className="p-8 text-center space-y-2">
+                <Search className="w-8 h-8 text-[#4A4D60] mx-auto opacity-40 animate-pulse" aria-hidden="true" />
+                <p className="text-sm font-bold text-[#F0F2FF] font-display">No hay resultados</p>
+                <p className="text-xs text-[#8B8FA8] font-sans">
+                  Prueba buscando otra ruta (ej. “Centro”) o paradero.
                 </p>
               </div>
             )}

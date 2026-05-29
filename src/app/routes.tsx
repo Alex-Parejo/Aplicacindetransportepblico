@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router";
+import { createHashRouter } from "react-router";
 import { Home } from "./pages/Home";
 import { Routes } from "./pages/Routes";
 import { MyTrip } from "./pages/MyTrip";
@@ -9,7 +9,7 @@ import { Live } from "./pages/Live";
 import { Layout } from "./components/Layout";
 
 // Router configuration for BusSamario v1.0
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: "/",
     Component: Layout,

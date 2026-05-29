@@ -42,11 +42,11 @@ export const busRoutes: BusRoute[] = [
     },
     stops: [
       "Terminal de Transportes",
-      "Parque de Los Novios",
-      "Av. Santa Rita",
       "Centro Comercial Buenavista",
-      "Irotama",
-      "Rodadero"
+      "Av. Santa Rita",
+      "Parque de Los Novios",
+      "Rodadero",
+      "Irotama"
     ],
   },
   {
@@ -65,10 +65,10 @@ export const busRoutes: BusRoute[] = [
     stops: [
       "Mamatoco Centro",
       "Universidad del Magdalena",
-      "Centro Histórico",
       "Av. Libertador",
-      "Pozos Colorados",
-      "Gaira Pueblo"
+      "Centro Histórico",
+      "Gaira Pueblo",
+      "Pozos Colorados"
     ],
   },
   {
@@ -107,11 +107,11 @@ export const busRoutes: BusRoute[] = [
     },
     stops: [
       "Terminal de Transportes",
-      "Mercado Público",
-      "Catedral",
-      "Parque Simón Bolívar",
-      "Camellón",
       "Quinta de San Pedro",
+      "Mercado Público",
+      "Camellón",
+      "Parque Simón Bolívar",
+      "Catedral",
       "Terminal de Transportes"
     ],
   },
@@ -131,7 +131,7 @@ export const busRoutes: BusRoute[] = [
     stops: [
       "Bonda Entrada",
       "Minca Vía",
-      "Quebrada del Doctor",
+      "Once de Noviembre",
       "Mamatoco",
       "Universidad",
       "Centro Histórico"
@@ -153,10 +153,10 @@ export const busRoutes: BusRoute[] = [
     stops: [
       "Aeropuerto Internacional",
       "Vía Ciénaga",
-      "Parque del Amor",
-      "Centro Comercial Ocean Mall",
-      "Rodadero",
       "Irotama",
+      "Pozos Colorados",
+      "Rodadero",
+      "Centro Comercial Ocean Mall",
       "Parque de Los Novios"
     ],
   },
@@ -175,12 +175,12 @@ export const busRoutes: BusRoute[] = [
     },
     stops: [
       "Universidad del Magdalena",
-      "Hospital San José",
-      "Parque de Los Novios",
-      "Av. Santa Rita",
       "Centro Comercial Buenavista",
-      "Irotama",
-      "El Rodadero"
+      "Hospital San José",
+      "Av. Santa Rita",
+      "Parque de Los Novios",
+      "El Rodadero",
+      "Irotama"
     ],
   },
   {
@@ -221,8 +221,8 @@ export const busRoutes: BusRoute[] = [
     stops: [
       "Los Almendros",
       "La Concepción",
-      "Once de Noviembre",
       "Mercado Público",
+      "Av. Libertador",
       "Terminal de Transportes",
       "Universidad del Magdalena"
     ],
@@ -243,9 +243,9 @@ export const busRoutes: BusRoute[] = [
     stops: [
       "María Eugenia",
       "Villa del Carmen",
-      "Don Jaca",
-      "Mamatoco Centro",
       "Hospital San José",
+      "Terminal de Transportes",
+      "Mamatoco Centro",
       "Universidad del Magdalena"
     ],
   },
@@ -264,9 +264,9 @@ export const busRoutes: BusRoute[] = [
     },
     stops: [
       "Pozos Colorados",
-      "Polideportivo",
-      "Av. Libertador",
       "Terminal de Transportes",
+      "Av. Libertador",
+      "Polideportivo",
       "Mercado Público",
       "Centro Histórico"
     ],
@@ -286,10 +286,10 @@ export const busRoutes: BusRoute[] = [
     },
     stops: [
       "20 de Julio",
-      "Once de Noviembre",
       "Terminal de Transportes",
       "Hospital San José",
       "Mamatoco Centro",
+      "Once de Noviembre",
       "Universidad del Magdalena"
     ],
   },
