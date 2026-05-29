@@ -1,0 +1,145 @@
+@theme {
+  /* Background hierarchy */
+  --color-background: #0D0F14;
+  --color-foreground: #F0F2FF;
+
+  /* Surface hierarchy */
+  --color-card: #161820;
+  --color-card-foreground: #F0F2FF;
+
+  --color-surface-2: #1E2029;
+  --color-surface-3: #252733;
+
+  /* Primary accent - Electric mint */
+  --color-primary: #00E5A0;
+  --color-primary-foreground: #0D0F14;
+
+  /* Secondary accent - Vibrant blue */
+  --color-secondary: #4F8EF7;
+  --color-secondary-foreground: #F0F2FF;
+
+  /* Tertiary accent - Coral/red for alerts */
+  --color-destructive: #FF6B6B;
+  --color-destructive-foreground: #F0F2FF;
+
+  /* Muted colors */
+  --color-muted: #1E2029;
+  --color-muted-foreground: #8B8FA8;
+
+  /* Accent surface */
+  --color-accent: #161820;
+  --color-accent-foreground: #F0F2FF;
+
+  /* Text hierarchy */
+  --color-text-primary: #F0F2FF;
+  --color-text-secondary: #8B8FA8;
+  --color-text-faint: #4A4D60;
+
+  /* Border and dividers */
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-divider: rgba(255, 255, 255, 0.06);
+  --color-input: #1E2029;
+  --color-ring: #00E5A0;
+
+  /* Border radius scale */
+  --radius-xl: 1.25rem;  /* 20px - Main cards */
+  --radius-lg: 0.875rem; /* 14px - Secondary cards */
+  --radius-md: 0.625rem; /* 10px - Buttons/inputs */
+  --radius-sm: 0.375rem; /* 6px - Badges/chips */
+  --radius-full: 9999px; /* Pills/avatars */
+
+  /* Typography - Font families */
+  --font-display: "Plus Jakarta Sans", sans-serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", monospace;
+
+  /* Custom shadows */
+  --shadow-glow: 0px 0px 24px rgba(0, 229, 160, 0.18);
+  --shadow-card: 0px 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-navbar: 0px -4px 20px rgba(0, 0, 0, 0.35);
+}
+
+/* Global font settings */
+* {
+  font-family: var(--font-body);
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}
+
+/* Leaflet Dark Theme */
+.leaflet-container {
+  background: #0D0F14 !important;
+}
+
+.leaflet-tile-pane {
+  filter: brightness(0.6) invert(1) contrast(3) hue-rotate(200deg) saturate(0.3) brightness(0.7);
+}
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: #161820 !important;
+  color: #F0F2FF !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.leaflet-popup-content {
+  margin: 12px !important;
+  font-family: var(--font-body) !important;
+}
+
+.leaflet-control-zoom a {
+  background-color: #161820 !important;
+  color: #F0F2FF !important;
+  border: 1px solid rgba(255, 255, 255, 0.09) !important;
+  border-radius: 10px !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #1E2029 !important;
+  border-color: #00E5A0 !important;
+}
+
+.leaflet-control-attribution {
+  background-color: rgba(22, 24, 32, 0.8) !important;
+  color: #8B8FA8 !important;
+  font-family: var(--font-body) !important;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #1E2029;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #4A4D60;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #8B8FA8;
+}
+
+/* Input autofill styling */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #F0F2FF;
+  -webkit-box-shadow: 0 0 0px 1000px #161820 inset;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* Selection styling */
+::selection {
+  background-color: rgba(0, 229, 160, 0.3);
+  color: #F0F2FF;
+}

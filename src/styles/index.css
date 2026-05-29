@@ -1,0 +1,5 @@
+/* BusSamario v1.0 - Main styles */
+@import './fonts.css';
+@import './tailwind.css';
+@import './theme.css';
+@import 'leaflet/dist/leaflet.css';
