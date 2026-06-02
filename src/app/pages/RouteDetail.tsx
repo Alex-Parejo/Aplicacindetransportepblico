@@ -100,7 +100,7 @@ export function RouteDetail() {
         />
 
         {/* Back Link */}
-        <Link to="/routes" className="inline-flex items-center gap-2 text-xs font-bold text-[#8B8FA8] hover:text-[#F0F2FF] transition-colors focus-ring-premium rounded-lg px-2 py-1 bg-white/5 border border-white/5 mb-5">
+        <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 text-xs font-bold text-[#8B8FA8] hover:text-[#F0F2FF] transition-colors focus-ring-premium rounded-lg px-2 py-1 bg-white/5 border border-white/5 mb-5">
           <ArrowLeft className="w-4 h-4" />
           Atrás
         </Link>
