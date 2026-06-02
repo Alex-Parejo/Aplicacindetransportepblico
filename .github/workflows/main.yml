@@ -1,4 +1,4 @@
-name: Build Android APK
+name: Build APK and Deploy to GitHub Pages
 
 on:
   workflow_dispatch:
@@ -6,10 +6,13 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
+  # JOB 1: Compilar el APK de Android
   build-apk:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -45,14 +48,10 @@ jobs:
         with:
           name: transporte-publico-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
-  push:
-    branches:
-      - main
 
-jobs:
-  build-apk:
+  # JOB 2: Desplegar la web en GitHub Pages de forma automática
+  deploy-gh-pages:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -62,49 +61,14 @@ jobs:
         with:
           node-version: 20
 
-      - name: Setup Java
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: 17
-
       - name: Install dependencies
-        run: npm install
-
-      - name: Install Capacitor
-        run: npm install @capacitor/core @capacitor/cli @capacitor/android --save-dev
-
-      - name: Create Capacitor config
-        run: |
-          cat > capacitor.config.ts <<'EOF'
-          import type { CapacitorConfig } from '@capacitor/cli';
-
-          const config: CapacitorConfig = {
-            appId: 'com.santamarta.transportepublico',
-            appName: 'Transporte Público Santa Marta',
-            webDir: 'dist',
-            server: {
-              androidScheme: 'https'
-            }
-          };
-
-          export default config;
-          EOF
+        run: npm install --legacy-peer-deps
 
       - name: Build web app
         run: npm run build
 
-      - name: Add Android platform
-        run: npx cap add android
-
-      - name: Sync Android
-        run: npx cap sync android
-
-      - name: Build APK
-        run: cd android && chmod +x gradlew && ./gradlew assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
         with:
-          name: transporte-publico-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          folder: dist # Sube la carpeta dist que genera Vite
+          branch: gh-pages # Sube los archivos a la rama de GitHub Pages
