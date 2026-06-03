@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Search, X, Clock, Navigation, Bus, MapPin } from "lucide-react";
+import { Search, X, Clock, Navigation, Bus, MapPin, Compass } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { busRoutes, busStops } from "../data/routes";
 import { cn } from "./ui/utils";
