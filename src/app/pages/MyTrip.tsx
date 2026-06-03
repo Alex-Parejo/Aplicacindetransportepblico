@@ -118,9 +118,9 @@ export function MyTrip() {
 
   // Redirect to home if no active trip
   useEffect(() => {
-    if (!activeRouteId) {
-      navigate("/");
-    }
+   if (!activeRouteId) {
+  return;
+}
   }, [activeRouteId, navigate]);
 
   // Load profile
@@ -726,6 +726,25 @@ export function MyTrip() {
     };
   }, [isTouristMode, mapReady]);
 
+    if (!activeRouteId) {
+    return (
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-8">
+        <div className="w-16 h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
+          <Navigation className="w-8 h-8 text-[#8B8FA8]" />
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="text-base font-bold text-[#F0F2FF] font-display">Sin viaje activo</h2>
+          <p className="text-xs text-[#8B8FA8] font-sans">Selecciona una ruta para comenzar tu viaje.</p>
+        </div>
+        <Toast
+          isOpen={toast.isOpen}
+          onClose={() => setToast({ ...toast, isOpen: false })}
+          message={toast.message}
+          type={toast.type}
+        />
+      </div>
+    );
+  }
   return (
     <div className="absolute inset-0 flex flex-col overflow-hidden">
       {/* Real-time Alert Notification Banner */}
